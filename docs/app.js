@@ -1,23 +1,370 @@
-const $=id=>document.getElementById(id);const API=(window.KHO_CONFIG?.API_BASE||"").replace(/\/$/,"");let token="",me=null,state={devices:[],movements:[],categories:[]};const roleName={admin:"Quản trị viên",storekeeper:"Thủ kho",technician:"Kỹ thuật",viewer:"Chỉ xem"};
-async function api(path,opts={}){if(!API||API.includes("REPLACE-WITH"))throw Error("Chưa cấu hình API_BASE trong config.js");const r=await fetch(API+path,{...opts,headers:{"Content-Type":"application/json",...(token?{Authorization:"Bearer "+token}:{}),...(opts.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.error||"Lỗi API "+r.status);return d}
-function toast(s){const t=$("toast");t.textContent=s;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2600)}function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}function statusPill(s){let c=s==="Đang sử dụng"?"using":["Hỏng","Đã thanh lý"].includes(s)?"bad":s==="Đang bảo trì"?"repair":"";return `<span class="pill ${c}">${esc(s)}</span>`}
-async function refresh(){ $("sync").textContent="Đang tải...";state=await api("/api/state");render();$("sync").textContent="Đã đồng bộ"}
-function render(){const d=state.devices||[],m=state.movements||[],cats=state.categories||[];$("kinds").textContent=d.length;$("qty").textContent=d.reduce((a,x)=>a+(+x.qty||0),0).toLocaleString("vi-VN");$("using").textContent=d.filter(x=>x.status==="Đang sử dụng").reduce((a,x)=>a+(+x.qty||0),0);$("repair").textContent=d.filter(x=>["Hỏng","Đang bảo trì"].includes(x.status)).reduce((a,x)=>a+(+x.qty||0),0);$("recent").innerHTML=d.slice(-6).reverse().map(x=>`<tr><td>${esc(x.code)}</td><td>${esc(x.name)}</td><td>${esc(x.category)}</td><td>${x.qty}</td><td>${statusPill(x.status)}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">Chưa có thiết bị</td></tr>';renderDevices();$("movementRows").innerHTML=m.slice().reverse().map(x=>`<tr><td>${esc(x.code)}</td><td>${esc(x.date)}</td><td>${esc(x.type)}</td><td>${esc(x.deviceCode)}<span class="sub">${esc(x.deviceName)}</span></td><td>${x.qty}</td><td>${esc(x.person||"—")}<span class="sub">${esc(x.department||"")}</span></td><td>${esc(x.doc||"—")}</td></tr>`).join("")||'<tr><td colspan="7" class="empty">Chưa có giao dịch</td></tr>';$("serials").textContent=d.filter(x=>x.serial).length;$("moveCount").textContent=m.length;$("value").textContent=d.reduce((a,x)=>a+(+x.qty||0)*(+x.price||0),0).toLocaleString("vi-VN")+" ₫";$("expired").textContent=d.filter(x=>x.warranty&&x.warranty<new Date().toISOString().slice(0,10)).length;const totals=cats.map(c=>({c,n:d.filter(x=>x.category===c).reduce((a,x)=>a+(+x.qty||0),0)})).filter(x=>x.n);const max=Math.max(1,...totals.map(x=>x.n));$("catReport").innerHTML=totals.map(x=>`<div class="bar"><div class="barlabel"><span>${esc(x.c)}</span><b>${x.n}</b></div><div class="track"><div class="fill" style="width:${x.n/max*100}%"></div></div></div>`).join("")||'<p class="muted">Chưa có số liệu</p>';const attention=d.filter(x=>["Hỏng","Đang bảo trì"].includes(x.status)||(x.warranty&&x.warranty<new Date().toISOString().slice(0,10)));$("attention").innerHTML=attention.map(x=>`<p>${esc(x.code)} — ${esc(x.name)} · ${statusPill(x.status)}</p>`).join("")||'<p class="muted">Không có thiết bị cần chú ý</p>';$("categoryRows").innerHTML=cats.map(c=>`<tr><td>${esc(c)}</td><td>${d.filter(x=>x.category===c).length}</td><td class="actions"><button class="smallbtn" data-cat-edit="${esc(c)}">Sửa</button><button class="smallbtn" data-cat-del="${esc(c)}">Xóa</button></td></tr>`).join("")}
-function renderDevices(){const q=$("search").value.toLowerCase(),st=$("filterStatus").value;const ds=state.devices.filter(x=>(!st||x.status===st)&&[x.code,x.name,x.serial,x.location,x.model].some(v=>String(v||"").toLowerCase().includes(q)));$("deviceRows").innerHTML=ds.map(x=>`<tr><td><b>${esc(x.code)}</b><span class="sub">${esc(x.serial||"Chưa có serial")}</span></td><td><b>${esc(x.name)}</b><span class="sub">${esc(x.model||"")}</span></td><td>${esc(x.category)}</td><td>${esc(x.location||"—")}</td><td>${x.qty} ${esc(x.unit||"Cái")}</td><td>${statusPill(x.status)}</td><td class="actions">${canWrite()?`<button class="smallbtn" data-edit="${esc(x.id)}">Sửa</button><button class="smallbtn" data-del="${esc(x.id)}">Xóa</button>`:""}</td></tr>`).join("")||'<tr><td colspan="7" class="empty">Không có dữ liệu phù hợp</td></tr>'}
-function canWrite(){return ["admin","storekeeper","technician"].includes(me?.role)}function setRoleUI(){document.querySelectorAll(".write-only").forEach(x=>x.classList.toggle("hidden",!canWrite()));document.querySelectorAll(".admin-only").forEach(x=>x.classList.toggle("hidden",me?.role!=="admin"));$("who").textContent=me.displayName||me.username;$("role").textContent=roleName[me.role]||me.role}
-async function login(e){e.preventDefault();$("loginError").textContent="";try{const r=await api("/api/login",{method:"POST",body:JSON.stringify({username:$("username").value,password:$("password").value})});token=r.token;me=r.user;$("login").classList.add("hidden");$("app").classList.remove("hidden");setRoleUI();await refresh()}catch(err){$("loginError").textContent=err.message}}
-$("loginForm").onsubmit=login;$("logout").onclick=()=>{token="";me=null;$("app").classList.add("hidden");$("login").classList.remove("hidden")};$("refresh").onclick=()=>refresh().catch(e=>toast(e.message));$("search").oninput=renderDevices;$("filterStatus").onchange=renderDevices;
-document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".view").forEach(x=>x.classList.add("hidden"));$(b.dataset.view).classList.remove("hidden");$("title").textContent=b.textContent.replace(/^[^\s]+\s/,"").trim()});
-const statuses=["Trong kho","Đang sử dụng","Đang bảo trì","Hỏng","Đã thanh lý"];
-function field(label,name,value="",type="text",opts=null,required=false){let inp=opts?`<select name="${name}" ${required?"required":""}>${opts.map(o=>`<option ${o===value?"selected":""}>${esc(o)}</option>`).join("")}</select>`:`<input name="${name}" type="${type}" value="${esc(value)}" ${required?"required":""} ${type==="number"?'min="0"':""}>`;return `<div class="field"><label>${label}${required?" *":""}</label>${inp}</div>`}
-function openEditor(title,fields,submit){$("modalTitle").textContent=title;$("editor").innerHTML=fields+'<div class="formactions"><button type="button" class="outline" id="cancelEdit">Hủy</button><button class="primary">Lưu</button></div>';$("modal").classList.remove("hidden");$("cancelEdit").onclick=closeEditor;$("editor").onsubmit=async e=>{e.preventDefault();const obj=Object.fromEntries(new FormData(e.target).entries());try{await submit(obj);closeEditor();await refresh();toast("Đã lưu")}catch(err){toast(err.message)}}}
-function closeEditor(){$("modal").classList.add("hidden")}
-$("closeModal").onclick=closeEditor;$("newDevice").onclick=()=>{if(!canWrite())return;const cats=state.categories;openEditor("Thêm thiết bị",field("Mã thiết bị","code","","text",null,true)+field("Tên thiết bị","name","","text",null,true)+field("Danh mục","category",cats[0],"text",cats,true)+field("Hãng / model","model")+field("Serial","serial")+field("Hiện trạng","status","Trong kho","text",statuses,true)+field("Số lượng","qty","1","number",null,true)+field("Đơn vị tính","unit","Cái","text",["Cái","Bộ","Chiếc","Cuộn","License","Gói"])+field("Vị trí","location")+field("Đơn vị / người quản lý","owner")+field("Ngày nhập","date",new Date().toISOString().slice(0,10),"date")+field("Hết bảo hành","warranty","","date")+field("Đơn giá VNĐ","price","0","number")+field("Tồn tối thiểu","min","1","number")+`<div class="field span2"><label>Ghi chú</label><input name="note"></div>`,async o=>api("/api/devices",{method:"POST",body:JSON.stringify({...o,qty:+o.qty,price:+o.price,min:+o.min})}))};
-document.addEventListener("click",async e=>{const ed=e.target.closest("[data-edit]");if(ed){const d=state.devices.find(x=>x.id===ed.dataset.edit);openEditor("Sửa thiết bị",Object.entries({code:"Mã thiết bị",name:"Tên thiết bị",category:"Danh mục",model:"Hãng/model",serial:"Serial",status:"Hiện trạng",qty:"Số lượng",unit:"Đơn vị",location:"Vị trí",owner:"Người quản lý",date:"Ngày nhập",warranty:"Hết bảo hành",price:"Đơn giá",min:"Tồn tối thiểu",note:"Ghi chú"}).map(([k,l])=>field(l,k,d[k]??"",["qty","price","min"].includes(k)?"number":["date","warranty"].includes(k)?"date":"text",k==="status"?statuses:k==="category"?state.categories:k==="unit"?["Cái","Bộ","Chiếc","Cuộn","License","Gói"]:null,k==="code"||k==="name")).join(""),async o=>api("/api/devices/"+encodeURIComponent(d.id),{method:"PUT",body:JSON.stringify({...o,qty:+o.qty,price:+o.price,min:+o.min})}));}
-const del=e.target.closest("[data-del]");if(del&&confirm("Xóa hồ sơ thiết bị này?"))try{await api("/api/devices/"+encodeURIComponent(del.dataset.del),{method:"DELETE"});await refresh();toast("Đã xóa")}catch(err){toast(err.message)}
-const ce=e.target.closest("[data-cat-edit]");if(ce){const old=ce.dataset.catEdit;openEditor("Sửa danh mục",field("Tên danh mục","name",old,"text",null,true),async o=>api("/api/categories",{method:"PUT",body:JSON.stringify({old,name:o.name})}))}
-const cd=e.target.closest("[data-cat-del]");if(cd&&confirm("Xóa danh mục này?"))try{await api("/api/categories",{method:"DELETE",body:JSON.stringify({name:cd.dataset.catDel})});await refresh()}catch(err){toast(err.message)}
+// Quản lý trạng thái ứng dụng
+let STATE = {
+  devices: [],
+  movements: [],
+  categories: [],
+  currentUser: null
+};
+
+// Khởi chạy khi mở trang
+document.addEventListener("DOMContentLoaded", () => {
+  const token = localStorage.getItem("kho_token");
+  const cachedUser = localStorage.getItem("kho_user");
+
+  if (token && cachedUser) {
+    try {
+      STATE.currentUser = JSON.parse(cachedUser);
+      showApp();
+      loadState();
+    } catch (e) {
+      handleLogout();
+    }
+  } else {
+    document.getElementById("login").classList.remove("hidden");
+    document.getElementById("app").classList.add("hidden");
+  }
 });
-$("newMovement").onclick=()=>{if(!canWrite())return;if(!state.devices.length){toast("Hãy thêm thiết bị trước");return}openEditor("Tạo phiếu kho",field("Loại phiếu","type","Nhập","text",["Nhập","Xuất","Thu hồi","Điều chuyển"],true)+field("Ngày","date",new Date().toISOString().slice(0,10),"date",null,true)+field("Thiết bị","deviceId",state.devices[0].id,"text",state.devices.map(d=>d.id+" — "+d.code+" — "+d.name),true)+field("Số lượng","qty","1","number",null,true)+field("Người giao / nhận","person")+field("Đơn vị","department")+field("Số chứng từ","doc")+field("Ghi chú","note"),async o=>{const dev=state.devices.find(d=>d.id===o.deviceId);if(!dev)throw Error("Không tìm thấy thiết bị");await api("/api/movements",{method:"POST",body:JSON.stringify({...o,qty:+o.qty,deviceId:dev.id,deviceCode:dev.code,deviceName:dev.name})})})};
-$("newCategory").onclick=()=>openEditor("Thêm danh mục",field("Tên danh mục","name","","text",null,true),async o=>api("/api/categories",{method:"POST",body:JSON.stringify(o)}));
-$("csv").onclick=()=>{const cols=["code","name","category","model","serial","status","qty","unit","location","owner","date","warranty","price","min","note"];const q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';const csv="\ufeff"+[cols.join(","),...state.devices.map(d=>cols.map(k=>q(d[k])).join(","))].join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="bao-cao-kho.csv";a.click()};
+
+// Chuyển Tab giao diện
+function showView(viewId) {
+  document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+
+  const target = document.getElementById(viewId);
+  if (target) target.classList.remove("hidden");
+
+  const btn = Array.from(document.querySelectorAll(".nav-btn")).find(b => b.getAttribute("onclick")?.includes(viewId));
+  if (btn) btn.classList.add("active");
+
+  const titles = {
+    dashboard: "Tổng quan",
+    devices: "Danh sách thiết bị",
+    movements: "Lịch sử xuất / nhập",
+    categories: "Danh mục",
+    users: "Quản trị người dùng"
+  };
+  document.getElementById("pageTitle").innerText = titles[viewId] || "Kho";
+
+  if (viewId === "users") loadUsers();
+}
+
+// Đăng nhập
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+  const errBox = document.getElementById("loginError");
+  errBox.classList.add("hidden");
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Đăng nhập thất bại");
+
+    localStorage.setItem("kho_token", data.token);
+    localStorage.setItem("kho_user", JSON.stringify(data.user));
+    STATE.currentUser = data.user;
+
+    showApp();
+    loadState();
+  } catch (err) {
+    errBox.innerText = err.message;
+    errBox.classList.remove("hidden");
+  }
+}
+
+function showApp() {
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  document.getElementById("currentUserName").innerText = STATE.currentUser.displayName || STATE.currentUser.username;
+  document.getElementById("userRoleBadge").innerText = STATE.currentUser.role === "admin" ? "Quản trị viên" : "Người xem (Viewer)";
+
+  // Ẩn/hiện các nút dành riêng cho Admin
+  const isAdmin = STATE.currentUser.role === "admin";
+  document.querySelectorAll(".admin-only").forEach(el => {
+    el.style.display = isAdmin ? "" : "none";
+  });
+}
+
+function handleLogout() {
+  localStorage.removeItem("kho_token");
+  localStorage.removeItem("kho_user");
+  location.reload();
+}
+
+// Tải dữ liệu từ Worker
+async function loadState() {
+  const token = localStorage.getItem("kho_token");
+  document.getElementById("syncStatus").innerText = "Đang tải...";
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/state`, {
+      headers: { Authorization: "Bearer " + token }
+    });
+
+    if (res.status === 401) return handleLogout();
+    const data = await res.json();
+
+    STATE.devices = data.devices || [];
+    STATE.movements = data.movements || [];
+    STATE.categories = data.categories || [];
+
+    renderDashboard();
+    renderDevices();
+    renderMovements();
+    renderCategories();
+    populateSelects();
+
+    document.getElementById("syncStatus").innerText = "Đã đồng bộ";
+  } catch (err) {
+    document.getElementById("syncStatus").innerText = "Lỗi kết nối";
+  }
+}
+
+// Dashboard
+function renderDashboard() {
+  document.getElementById("statTotalDevices").innerText = STATE.devices.length;
+  document.getElementById("statInStock").innerText = STATE.devices.filter(d => d.status === "Trong kho").length;
+  document.getElementById("statInUse").innerText = STATE.devices.filter(d => d.status === "Đang sử dụng").length;
+  document.getElementById("statFaulty").innerText = STATE.devices.filter(d => (d.status || "").includes("Hỏng")).length;
+}
+
+// Danh sách thiết bị
+function renderDevices() {
+  const q = (document.getElementById("deviceSearch")?.value || "").toLowerCase();
+  const filtered = STATE.devices.filter(d =>
+    (d.code || "").toLowerCase().includes(q) ||
+    (d.name || "").toLowerCase().includes(q) ||
+    (d.location || "").toLowerCase().includes(q)
+  );
+
+  const tbody = document.getElementById("deviceTableBody");
+  const isAdmin = STATE.currentUser?.role === "admin";
+
+  tbody.innerHTML = filtered.map(d => `
+    <tr>
+      <td><b>${d.code}</b></td>
+      <td>${d.name}</td>
+      <td>${d.category || ""}</td>
+      <td>${d.location || "-"}</td>
+      <td><span class="badge ${d.status === 'Trong kho' ? 'badge-primary' : 'badge-secondary'}">${d.status || "Trong kho"}</span></td>
+      ${isAdmin ? `
+        <td style="text-align:right;">
+          <button onclick="editDevice('\${d.code}')" style="cursor:pointer; margin-right:5px;">Sửa</button>
+          <button onclick="deleteDevice('\${d.code}')" style="color:red; cursor:pointer;">Xóa</button>
+        </td>` : `<td></td>`}
+    </tr>
+  `).join("");
+}
+
+// Lịch sử xuất/nhập
+function renderMovements() {
+  const tbody = document.getElementById("movementTableBody");
+  tbody.innerHTML = STATE.movements.map(m => `
+    <tr>
+      <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
+      <td><b>${m.deviceCode}</b></td>
+      <td>${m.type}</td>
+      <td>${m.fromLocation || "-"}</td>
+      <td>${m.toLocation || "-"}</td>
+      <td>${m.createdBy || "-"}</td>
+    </tr>
+  `).join("");
+}
+
+// Danh mục
+function renderCategories() {
+  const ul = document.getElementById("categoryList");
+  ul.innerHTML = STATE.categories.map(c => `<li>${c}</li>`).join("");
+}
+
+function populateSelects() {
+  const devCat = document.getElementById("devCategory");
+  devCat.innerHTML = STATE.categories.map(c => `<option value="${c}">${c}</option>`).join("");
+
+  const movDev = document.getElementById("movDeviceCode");
+  movDev.innerHTML = STATE.devices.map(d => `<option value="${d.code}">${d.code} - ${d.name}</option>`).join("");
+}
+
+// MODAL & GHI DỮ LIỆU THIẾT BỊ
+function openDeviceModal(code = null) {
+  document.getElementById("deviceModal").classList.remove("hidden");
+  if (code) {
+    const dev = STATE.devices.find(d => d.code === code);
+    document.getElementById("deviceModalTitle").innerText = "Chỉnh sửa thiết bị";
+    document.getElementById("devCode").value = dev.code;
+    document.getElementById("devCode").readOnly = true;
+    document.getElementById("devName").value = dev.name;
+    document.getElementById("devCategory").value = dev.category;
+    document.getElementById("devLocation").value = dev.location || "";
+    document.getElementById("devStatus").value = dev.status || "Trong kho";
+  } else {
+    document.getElementById("deviceModalTitle").innerText = "Thêm thiết bị mới";
+    document.getElementById("devCode").value = "";
+    document.getElementById("devCode").readOnly = false;
+    document.getElementById("devName").value = "";
+    document.getElementById("devLocation").value = "";
+  }
+}
+
+function editDevice(code) {
+  openDeviceModal(code);
+}
+
+async function handleSaveDevice(e) {
+  e.preventDefault();
+  const code = document.getElementById("devCode").value.trim();
+  const name = document.getElementById("devName").value.trim();
+  const category = document.getElementById("devCategory").value;
+  const location = document.getElementById("devLocation").value.trim();
+  const status = document.getElementById("devStatus").value;
+  const isEdit = document.getElementById("devCode").readOnly;
+
+  const action = isEdit ? "device.update" : "device.add";
+  await callMutate(action, { code, name, category, location, status });
+  closeModal("deviceModal");
+  loadState();
+}
+
+async function deleteDevice(code) {
+  if (!confirm(`Bạn có chắc chắn muốn xóa thiết bị ${code}?`)) return;
+  await callMutate("device.delete", { code });
+  loadState();
+}
+
+// XUẤT NHẬP KHO
+function openMovementModal() {
+  document.getElementById("movementModal").classList.remove("hidden");
+}
+
+async function handleSaveMovement(e) {
+  e.preventDefault();
+  const deviceCode = document.getElementById("movDeviceCode").value;
+  const type = document.getElementById("movType").value;
+  const toLocation = document.getElementById("movToLocation").value.trim();
+  const dev = STATE.devices.find(d => d.code === deviceCode);
+
+  await callMutate("movement.create", {
+    deviceCode,
+    type,
+    fromLocation: dev ? dev.location : "",
+    toLocation,
+    status: type === "Xuất kho" ? "Đang sử dụng" : (type === "Nhập kho" ? "Trong kho" : "Hỏng / Bảo hành")
+  });
+  closeModal("movementModal");
+  loadState();
+}
+
+async function callMutate(action, payload) {
+  const token = localStorage.getItem("kho_token");
+  const res = await fetch(`${API_BASE_URL}/api/mutate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token
+    },
+    body: JSON.stringify({ action, payload })
+  });
+
+  const data = await res.json();
+  if (!res.ok) alert(data.error || "Thao tác thất bại");
+}
+
+// ----------------------------------------------------
+// QUẢN LÝ NGƯỜI DÙNG (USER MANAGEMENT)
+// ----------------------------------------------------
+async function loadUsers() {
+  const token = localStorage.getItem("kho_token");
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/users`, {
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const tbody = document.getElementById("userTableBody");
+
+    tbody.innerHTML = data.users.map(u => `
+      <tr>
+        <td><b>${u.username}</b></td>
+        <td>${u.displayName || ""}</td>
+        <td><span class="badge ${u.role === 'admin' ? 'badge-primary' : 'badge-secondary'}">${u.role === 'admin' ? 'Quản trị viên' : 'Chỉ xem (Viewer)'}</span></td>
+        <td style="text-align:right;">
+          ${u.username.toLowerCase() !== 'admin' ? `
+            <button onclick="deleteUser('\${u.username}')" style="color:red; cursor:pointer;">Xóa</button>
+          ` : '<small class="muted">Tài khoản chính</small>'}
+        </td>
+      </tr>
+    `).join("");
+  } catch (e) {
+    console.error("Lỗi nạp users:", e);
+  }
+}
+
+function openUserModal() {
+  document.getElementById("userModal").classList.remove("hidden");
+  document.getElementById("usrUsername").value = "";
+  document.getElementById("usrUsername").readOnly = false;
+  document.getElementById("usrPassword").value = "";
+  document.getElementById("usrDisplayName").value = "";
+  document.getElementById("usrRole").value = "viewer";
+}
+
+async function handleSaveUser(e) {
+  e.preventDefault();
+  const username = document.getElementById("usrUsername").value.trim();
+  const password = document.getElementById("usrPassword").value;
+  const displayName = document.getElementById("usrDisplayName").value.trim();
+  const role = document.getElementById("usrRole").value;
+
+  const token = localStorage.getItem("kho_token");
+  const res = await fetch(`${API_BASE_URL}/api/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token
+    },
+    body: JSON.stringify({
+      action: "add",
+      user: { username, password, displayName, role }
+    })
+  });
+
+  const data = await res.json();
+  if (res.ok) {
+    alert("Lưu thông tin người dùng thành công!");
+    closeModal("userModal");
+    loadUsers();
+  } else {
+    alert("Lỗi: " + (data.error || "Không thể lưu"));
+  }
+}
+
+async function deleteUser(username) {
+  if (!confirm(`Bạn có chắc chắn muốn xóa tài khoản [${username}] không?`)) return;
+  const token = localStorage.getItem("kho_token");
+  const res = await fetch(`${API_BASE_URL}/api/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token
+    },
+    body: JSON.stringify({ action: "delete", username })
+  });
+
+  const data = await res.json();
+  if (res.ok) {
+    alert("Đã xóa người dùng!");
+    loadUsers();
+  } else {
+    alert("Lỗi: " + (data.error || "Không thể xóa"));
+  }
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.add("hidden");
+}
