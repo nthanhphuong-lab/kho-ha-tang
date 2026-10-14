@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "",
+  "devices": [],
+  "movements": [],
+  "categories": [
+    "Router / Firewall",
+    "Switch mạng",
+    "Access Point Wi-Fi",
+    "Thiết bị quang / SFP",
+    "ONT / Modem",
+    "Server / Máy chủ",
+    "Lưu trữ NAS / SAN",
+    "UPS / nguồn điện",
+    "Tủ rack / phụ kiện",
+    "Cáp mạng / patch cord",
+    "Camera / NVR",
+    "Máy tính / máy trạm",
+    "Điện thoại IP",
+    "License / phần mềm",
+    "Công cụ đo kiểm",
+    "Khác"
+  ]
+}

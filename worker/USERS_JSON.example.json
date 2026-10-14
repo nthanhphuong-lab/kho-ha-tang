@@ -1,0 +1,34 @@
+[
+  {
+    "username": "admin",
+    "displayName": "Quản trị",
+    "role": "admin",
+    "salt": "PASTE_SALT",
+    "passwordHash": "PASTE_HASH",
+    "enabled": true
+  },
+  {
+    "username": "thukho",
+    "displayName": "Thủ kho",
+    "role": "storekeeper",
+    "salt": "PASTE_SALT",
+    "passwordHash": "PASTE_HASH",
+    "enabled": true
+  },
+  {
+    "username": "kythuat",
+    "displayName": "Kỹ thuật",
+    "role": "technician",
+    "salt": "PASTE_SALT",
+    "passwordHash": "PASTE_HASH",
+    "enabled": true
+  },
+  {
+    "username": "xem",
+    "displayName": "Chỉ xem",
+    "role": "viewer",
+    "salt": "PASTE_SALT",
+    "passwordHash": "PASTE_HASH",
+    "enabled": true
+  }
+]
