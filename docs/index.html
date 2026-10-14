@@ -1,11 +1,245 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kho Hạ Tầng</title><link rel="stylesheet" href="style.css"></head><body>
-<div id="login" class="login"><div class="card login-card"><div class="logo">K+</div><p class="eyebrow">QUẢN TRỊ TÀI SẢN CNTT</p><h1>Kho Hạ Tầng</h1><p class="muted">Đăng nhập để quản lý thiết bị và phiếu kho.</p><form id="loginForm"><label>Tài khoản</label><input id="username" required autocomplete="username" placeholder="Tên đăng nhập"><label>Mật khẩu</label><input id="password" type="password" required autocomplete="current-password" placeholder="Mật khẩu"><button class="primary wide">Đăng nhập</button></form><p id="loginError" class="error"></p></div></div>
-<div id="app" class="hidden"><aside><div class="brand"><div class="logo">K+</div><div><b>Kho Hạ Tầng</b><small>Quản trị thiết bị</small></div></div><button class="nav active" data-view="dashboard">▦ Tổng quan</button><button class="nav" data-view="devices">▤ Thiết bị</button><button class="nav" data-view="movements">⇄ Xuất / nhập</button><button class="nav" data-view="reports">▥ Báo cáo</button><button class="nav admin-only" data-view="categories">◇ Danh mục</button><div class="user"><div><b id="who"></b><small id="role"></small></div><button id="logout" class="outline">Thoát</button></div></aside>
-<main><header><div><p class="eyebrow">HỆ THỐNG QUẢN LÝ KHO</p><h1 id="title">Tổng quan</h1></div><div><span id="sync" class="muted">Đang tải...</span> <button id="refresh" class="outline">Làm mới</button></div></header>
-<section id="dashboard" class="view"><div class="hero"><p class="eyebrow">BẢNG ĐIỀU KHIỂN</p><h2>Xin chào!</h2><p>Theo dõi tài sản và luồng xuất nhập kho tại một nơi.</p></div><div class="stats"><div class="card"><span>Mã thiết bị</span><strong id="kinds">0</strong></div><div class="card"><span>Tổng số lượng</span><strong id="qty">0</strong></div><div class="card"><span>Đang sử dụng</span><strong id="using">0</strong></div><div class="card"><span>Cần xử lý</span><strong id="repair">0</strong></div></div><div class="card"><h3>Thiết bị gần đây</h3><div class="tablewrap"><table><thead><tr><th>Mã</th><th>Tên thiết bị</th><th>Danh mục</th><th>SL</th><th>Hiện trạng</th></tr></thead><tbody id="recent"></tbody></table></div></div></section>
-<section id="devices" class="view hidden"><div class="toolbar"><input id="search" placeholder="Tìm mã, tên, serial, vị trí..."><select id="filterStatus"><option value="">Mọi hiện trạng</option><option>Trong kho</option><option>Đang sử dụng</option><option>Đang bảo trì</option><option>Hỏng</option><option>Đã thanh lý</option></select><button class="primary write-only" id="newDevice">＋ Thêm thiết bị</button></div><div class="card"><div class="tablewrap"><table><thead><tr><th>Mã / serial</th><th>Thiết bị</th><th>Danh mục</th><th>Vị trí</th><th>SL</th><th>Trạng thái</th><th></th></tr></thead><tbody id="deviceRows"></tbody></table></div></div></section>
-<section id="movements" class="view hidden"><div class="toolbar"><div><h2>Lịch sử xuất / nhập</h2><p class="muted">Giao dịch được lưu thành phiên bản trong GitHub.</p></div><button class="primary write-only" id="newMovement">＋ Tạo phiếu</button></div><div class="card"><div class="tablewrap"><table><thead><tr><th>Mã phiếu</th><th>Ngày</th><th>Loại</th><th>Thiết bị</th><th>SL</th><th>Người nhận/giao</th><th>Chứng từ</th></tr></thead><tbody id="movementRows"></tbody></table></div></div></section>
-<section id="reports" class="view hidden"><div class="toolbar"><div><h2>Báo cáo tồn kho</h2><p class="muted">Tải báo cáo CSV để xử lý trong Excel.</p></div><button class="outline" id="csv">↓ Xuất CSV</button></div><div class="stats"><div class="card"><span>Giá trị theo đơn giá</span><strong id="value">0 ₫</strong></div><div class="card"><span>Thiết bị có serial</span><strong id="serials">0</strong></div><div class="card"><span>Phiếu giao dịch</span><strong id="moveCount">0</strong></div><div class="card"><span>Hết bảo hành</span><strong id="expired">0</strong></div></div><div class="card"><h3>Tồn theo danh mục</h3><div id="catReport"></div><h3>Cần chú ý</h3><div id="attention"></div></div></section>
-<section id="categories" class="view hidden"><div class="toolbar"><h2>Danh mục thiết bị</h2><button class="primary admin-only" id="newCategory">＋ Thêm danh mục</button></div><div class="card"><div class="tablewrap"><table><thead><tr><th>Tên danh mục</th><th>Số hồ sơ</th><th></th></tr></thead><tbody id="categoryRows"></tbody></table></div></div></section>
-</main></div>
-<div id="modal" class="modal hidden"><div class="card modal-card"><div class="modalhead"><h2 id="modalTitle">Thêm mới</h2><button id="closeModal" class="x">×</button></div><form id="editor" class="formgrid"></form></div></div><div id="toast"></div><script src="config.js"></script><script src="app.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kho Hạ Tầng CNTT</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- MÀN HÌNH ĐĂNG NHẬP -->
+  <div id="login" class="login">
+    <div class="card login-card">
+      <div class="logo">K</div>
+      <p class="eyebrow">QUẢN TRỊ TÀI SẢN CNTT</p>
+      <h2>Kho Hạ Tầng</h2>
+      <p class="muted">Đăng nhập để xem và quản lý thiết bị hạ tầng</p>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <label>Tên đăng nhập</label>
+        <input type="text" id="username" required placeholder="admin hoặc tên tài khoản">
+        <label>Mật khẩu</label>
+        <input type="password" id="password" required placeholder="••••••••">
+        <button type="submit" class="primary" style="width:100%; margin-top:1rem;">Đăng nhập</button>
+      </form>
+      <div id="loginError" class="error-msg hidden"></div>
+    </div>
+  </div>
+
+  <!-- GIAO DIỆN CHÍNH -->
+  <div id="app" class="hidden">
+    <!-- Cột bên trái -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">K</div>
+        <div>
+          <b>Kho Hạ Tầng</b>
+          <small id="userRoleBadge" class="muted">Quản trị viên</small>
+        </div>
+      </div>
+      <nav>
+        <button class="nav-btn active" onclick="showView('dashboard')">📊 Tổng quan</button>
+        <button class="nav-btn" onclick="showView('devices')">💻 Thiết bị</button>
+        <button class="nav-btn" onclick="showView('movements')">🔄 Xuất / Nhập</button>
+        <button class="nav-btn" onclick="showView('categories')">📁 Danh mục</button>
+        <button class="nav-btn admin-only" onclick="showView('users')">👥 Người dùng</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="currentUserName" style="font-weight:600; margin-bottom:5px;">Admin</div>
+        <button onclick="handleLogout()" class="secondary" style="width:100%;">Đăng xuất</button>
+      </div>
+    </aside>
+
+    <!-- Nội dung chính bên phải -->
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">HỆ THỐNG QUẢN LÝ KHO</p>
+          <h1 id="pageTitle">Tổng quan</h1>
+        </div>
+        <div>
+          <span id="syncStatus" class="badge">Đã đồng bộ</span>
+        </div>
+      </header>
+
+      <!-- TAB 1: TỔNG QUAN -->
+      <section id="dashboard" class="view">
+        <div class="stats-grid">
+          <div class="card stat-card">
+            <span class="muted">Tổng thiết bị</span>
+            <h2 id="statTotalDevices">0</h2>
+          </div>
+          <div class="card stat-card">
+            <span class="muted">Trong kho</span>
+            <h2 id="statInStock">0</h2>
+          </div>
+          <div class="card stat-card">
+            <span class="muted">Đang sử dụng</span>
+            <h2 id="statInUse">0</h2>
+          </div>
+          <div class="card stat-card">
+            <span class="muted">Hỏng / Cần kiểm tra</span>
+            <h2 id="statFaulty">0</h2>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: THIẾT BỊ -->
+      <section id="devices" class="view hidden">
+        <div class="toolbar">
+          <input type="text" id="deviceSearch" placeholder="Tìm kiếm theo mã, tên, serial..." oninput="renderDevices()">
+          <button class="primary admin-only" onclick="openDeviceModal()">+ Thêm thiết bị</button>
+        </div>
+        <div class="table-container card">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Mã</th>
+                <th>Tên thiết bị</th>
+                <th>Danh mục</th>
+                <th>Vị trí</th>
+                <th>Tình trạng</th>
+                <th class="admin-only" style="text-align:right;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="deviceTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 3: XUẤT NHẬP -->
+      <section id="movements" class="view hidden">
+        <div class="toolbar">
+          <h2>Lịch sử xuất / nhập kho</h2>
+          <button class="primary admin-only" onclick="openMovementModal()">+ Tạo phiếu xuất/nhập</button>
+        </div>
+        <div class="table-container card">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Mã thiết bị</th>
+                <th>Loại giao dịch</th>
+                <th>Từ vị trí</th>
+                <th>Đến vị trí</th>
+                <th>Người thực hiện</th>
+              </tr>
+            </thead>
+            <tbody id="movementTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 4: DANH MỤC -->
+      <section id="categories" class="view hidden">
+        <div class="card">
+          <h2>Danh mục thiết bị</h2>
+          <ul id="categoryList" style="margin-top:1rem; padding-left:1.5rem; line-height:2;"></ul>
+        </div>
+      </section>
+
+      <!-- TAB 5: QUẢN LÝ NGƯỜI DÙNG (CHỈ ADMIN) -->
+      <section id="users" class="view hidden">
+        <div class="toolbar">
+          <div>
+            <h2>Quản trị người dùng</h2>
+            <p class="muted">Thêm tài khoản và phân quyền cho cán bộ vào xem hoặc chỉnh sửa kho</p>
+          </div>
+          <button class="primary admin-only" onclick="openUserModal()">+ Thêm người dùng</button>
+        </div>
+        <div class="table-container card">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Tên đăng nhập</th>
+                <th>Tên hiển thị</th>
+                <th>Vai trò</th>
+                <th style="text-align:right;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL THÊM / SỬA THIẾT BỊ -->
+  <div id="deviceModal" class="modal hidden">
+    <div class="modal-card card">
+      <h3 id="deviceModalTitle">Thêm thiết bị mới</h3>
+      <form onsubmit="handleSaveDevice(event)">
+        <label>Mã thiết bị (*)</label>
+        <input type="text" id="devCode" required placeholder="VD: SW-C3560-01">
+        <label>Tên thiết bị (*)</label>
+        <input type="text" id="devName" required placeholder="VD: Cisco Catalyst 3560">
+        <label>Danh mục</label>
+        <select id="devCategory"></select>
+        <label>Vị trí</label>
+        <input type="text" id="devLocation" placeholder="VD: Phòng Server Tầng 3">
+        <label>Tình trạng</label>
+        <select id="devStatus">
+          <option value="Trong kho">Trong kho</option>
+          <option value="Đang sử dụng">Đang sử dụng</option>
+          <option value="Hỏng / Bảo hành">Hỏng / Bảo hành</option>
+          <option value="Thanh lý">Thanh lý</option>
+        </select>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:1.5rem;">
+          <button type="button" class="secondary" onclick="closeModal('deviceModal')">Hủy</button>
+          <button type="submit" class="primary">Lưu thiết bị</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL THÊM NGƯỜI DÙNG -->
+  <div id="userModal" class="modal hidden">
+    <div class="modal-card card">
+      <h3 id="userModalTitle">Thêm người dùng mới</h3>
+      <form onsubmit="handleSaveUser(event)">
+        <label>Tên đăng nhập (*)</label>
+        <input type="text" id="usrUsername" required placeholder="VD: user01, phuong.nt...">
+        <label>Mật khẩu (*)</label>
+        <input type="password" id="usrPassword" placeholder="Nhập mật khẩu mới">
+        <label>Tên hiển thị</label>
+        <input type="text" id="usrDisplayName" placeholder="VD: Cán bộ giám sát">
+        <label>Quyền hạn</label>
+        <select id="usrRole">
+          <option value="viewer">Người xem (Chỉ được xem, không được sửa)</option>
+          <option value="admin">Quản trị viên (Toàn quyền)</option>
+        </select>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:1.5rem;">
+          <button type="button" class="secondary" onclick="closeModal('userModal')">Hủy</button>
+          <button type="submit" class="primary">Lưu người dùng</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL XUẤT NHẬP KHO -->
+  <div id="movementModal" class="modal hidden">
+    <div class="modal-card card">
+      <h3>Tạo phiếu xuất / nhập kho</h3>
+      <form onsubmit="handleSaveMovement(event)">
+        <label>Chọn thiết bị (*)</label>
+        <select id="movDeviceCode" required></select>
+        <label>Loại giao dịch</label>
+        <select id="movType">
+          <option value="Xuất kho">Xuất kho sử dụng</option>
+          <option value="Nhập kho">Nhập lại kho</option>
+          <option value="Bảo hành">Đem đi sửa chữa / bảo hành</option>
+        </select>
+        <label>Đến vị trí mới</label>
+        <input type="text" id="movToLocation" placeholder="VD: Phòng họp A, Ban Giám hiệu...">
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:1.5rem;">
+          <button type="button" class="secondary" onclick="closeModal('movementModal')">Hủy</button>
+          <button type="submit" class="primary">Xác nhận</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
