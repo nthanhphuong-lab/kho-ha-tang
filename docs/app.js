@@ -139,7 +139,7 @@ function renderDashboard() {
   ).length;
 }
 
-// BỘ LỌC ĐA NĂNG 3 LỚP (TỪ KHÓA + DANH MỤC + VỊ TRÍ)
+// BỘ LỌC ĐA NĂNG
 function getFilteredDevices() {
   const q = (document.getElementById("deviceSearch")?.value || "").toLowerCase().trim();
   const cat = document.getElementById("filterCategory")?.value || "";
@@ -175,6 +175,7 @@ function renderDevices() {
 
   tbody.innerHTML = filtered.map(d => {
     const isChecked = selectedCodes.has(d.code);
+    const safeCode = encodeURIComponent(d.code);
     return `
       <tr>
         ${isAdmin ? `
@@ -198,9 +199,9 @@ function renderDevices() {
         </td>
         ${isAdmin ? `
           <td style="text-align:right; white-space:nowrap;">
-            <button onclick="quickAction('\${d.code}')" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
-            <button onclick="editDevice('\${d.code}')" style="cursor:pointer; margin-right:4px;">Sửa</button>
-            <button onclick="deleteDevice('\${d.code}')" style="color:red; cursor:pointer;">Xóa</button>
+            <button onclick="quickAction(decodeURIComponent('\${safeCode}'))" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
+            <button onclick="editDevice(decodeURIComponent('\${safeCode}'))" style="cursor:pointer; margin-right:4px;">Sửa</button>
+            <button onclick="deleteDevice(decodeURIComponent('\${safeCode}'))" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -215,7 +216,6 @@ function toggleSelectDevice(code, isChecked) {
   updateFloatingBar();
 }
 
-// CHỌN TẤT CẢ THEO KẾT QUẢ ĐANG LỌC
 function toggleSelectAllFiltered(masterCheckbox) {
   const filtered = getFilteredDevices();
   filtered.forEach(d => {
@@ -246,7 +246,168 @@ function updateFloatingBar() {
 }
 
 // ----------------------------------------------------
-// QUẢN LÝ VỊ TRÍ & KHO (LOCATIONS)
+// THIẾT BỊ (SỬA LỖI KHÔNG NẠP ĐƯỢC FORM SỬA THIẾT BỊ)
+// ----------------------------------------------------
+function openDeviceModal(code = null) {
+  populateSelects(); // Đảm bảo danh mục và vị trí đã được nạp vào option
+  document.getElementById("deviceModal").classList.remove("hidden");
+
+  if (code) {
+    // So sánh chuẩn hóa không phân biệt hoa thường và khoảng trắng
+    const cleanCode = String(code).trim().toLowerCase();
+    const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === cleanCode);
+
+    if (dev) {
+      document.getElementById("deviceModalTitle").innerText = "Chỉnh sửa hồ sơ thiết bị";
+      document.getElementById("devCode").value = dev.code || "";
+      document.getElementById("devCode").readOnly = true;
+      document.getElementById("devName").value = dev.name || "";
+      document.getElementById("devModel").value = dev.model || "";
+      document.getElementById("devSerial").value = dev.serial || "";
+      document.getElementById("devCategory").value = dev.category || STATE.categories[0] || "";
+      document.getElementById("devLocation").value = dev.location || STATE.locations[0] || "";
+      document.getElementById("devStatus").value = dev.status || "Trong kho";
+      document.getElementById("devNotes").value = dev.notes || "";
+      return;
+    }
+  }
+
+  // Chế độ thêm mới nếu không truyền code
+  document.getElementById("deviceModalTitle").innerText = "Thêm thiết bị mới";
+  document.getElementById("devCode").value = "";
+  document.getElementById("devCode").readOnly = false;
+  document.getElementById("devName").value = "";
+  document.getElementById("devModel").value = "";
+  document.getElementById("devSerial").value = "";
+  document.getElementById("devCategory").value = STATE.categories[0] || "";
+  document.getElementById("devLocation").value = STATE.locations[0] || "";
+  document.getElementById("devStatus").value = "Trong kho";
+  document.getElementById("devNotes").value = "";
+}
+
+function editDevice(code) {
+  openDeviceModal(code);
+}
+
+async function handleSaveDevice(e) {
+  e.preventDefault();
+  const code = document.getElementById("devCode").value.trim();
+  const name = document.getElementById("devName").value.trim();
+  const model = document.getElementById("devModel").value.trim();
+  const serial = document.getElementById("devSerial").value.trim();
+  const category = document.getElementById("devCategory").value;
+  const location = document.getElementById("devLocation").value;
+  const status = document.getElementById("devStatus").value;
+  const notes = document.getElementById("devNotes").value.trim();
+  const isEdit = document.getElementById("devCode").readOnly;
+
+  const action = isEdit ? "device.update" : "device.add";
+  await callMutate(action, { code, name, model, serial, category, location, status, notes });
+  closeModal("deviceModal");
+  loadState();
+}
+
+async function deleteDevice(code) {
+  if (!confirm(`Bạn có chắc chắn muốn xóa thiết bị [${code}]?`)) return;
+  await callMutate("device.delete", { code });
+  loadState();
+}
+
+// ----------------------------------------------------
+// THAO TÁC ĐIỀU CHUYỂN / BÁO SỰ CỐ
+// ----------------------------------------------------
+function openMovementModal(preSelectCode = null) {
+  populateSelects();
+  document.getElementById("movementModal").classList.remove("hidden");
+
+  if (preSelectCode) {
+    const cleanCode = String(preSelectCode).trim().toLowerCase();
+    const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === cleanCode);
+    if (dev) {
+      document.getElementById("movDeviceCode").value = dev.code;
+    }
+  }
+
+  handleMovementTypeChange();
+}
+
+function quickAction(code) {
+  openMovementModal(code);
+}
+
+function handleSelectDeviceForMovement() {
+  handleMovementTypeChange();
+}
+
+function handleMovementTypeChange() {
+  const type = document.getElementById("movType").value;
+  const devCode = document.getElementById("movDeviceCode").value;
+  const cleanCode = String(devCode).trim().toLowerCase();
+  const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === cleanCode);
+  const toLocSelect = document.getElementById("movToLocation");
+  const noteInput = document.getElementById("movNote");
+
+  if (type === "Báo hỏng / Đi bảo hành") {
+    const loc = STATE.locations.find(l => l.includes("Kho")) || STATE.locations[0];
+    if (loc) toLocSelect.value = loc;
+    noteInput.placeholder = "VD: Cháy nguồn, hỏng quạt...";
+  } else if (type === "Đã sửa xong / Nhập lại kho") {
+    const loc = STATE.locations.find(l => l.includes("dự phòng") || l.includes("Kho")) || STATE.locations[0];
+    if (loc) toLocSelect.value = loc;
+    noteInput.placeholder = "VD: Đã thay linh kiện, hoạt động tốt";
+  } else if (type === "Báo thanh lý") {
+    const loc = STATE.locations.find(l => l.includes("thanh lý")) || STATE.locations[0];
+    if (loc) toLocSelect.value = loc;
+    noteInput.placeholder = "VD: Hỏng bo mạch chính không thể sửa...";
+  } else {
+    if (dev?.location) toLocSelect.value = dev.location;
+    noteInput.placeholder = "Ghi chú thêm...";
+  }
+}
+
+async function handleSaveMovement(e) {
+  e.preventDefault();
+  const deviceCode = document.getElementById("movDeviceCode").value;
+  const type = document.getElementById("movType").value;
+  const toLocation = document.getElementById("movToLocation").value;
+  const note = document.getElementById("movNote").value.trim();
+  const dev = STATE.devices.find(d => d.code === deviceCode);
+
+  let newStatus = "Đang sử dụng";
+  if (type === "Báo hỏng / Đi bảo hành") newStatus = "Hỏng / Bảo hành";
+  else if (type === "Đã sửa xong / Nhập lại kho") newStatus = "Trong kho";
+  else if (type === "Báo thanh lý") newStatus = "Thanh lý";
+
+  await callMutate("movement.create", {
+    deviceCode,
+    type,
+    fromLocation: dev ? dev.location : "",
+    toLocation,
+    status: newStatus,
+    note
+  });
+
+  closeModal("movementModal");
+  loadState();
+}
+
+function renderMovements() {
+  const tbody = document.getElementById("movementTableBody");
+  tbody.innerHTML = STATE.movements.map(m => `
+    <tr>
+      <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
+      <td><b>${m.deviceCode}</b></td>
+      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span></td>
+      <td>${m.fromLocation || "-"}</td>
+      <td><b>${m.toLocation || "-"}</b></td>
+      <td><small>${m.note || "-"}</small></td>
+      <td>${m.createdBy || "-"}</td>
+    </tr>
+  `).join("");
+}
+
+// ----------------------------------------------------
+// VỊ TRÍ & KHO (LOCATIONS)
 // ----------------------------------------------------
 function renderLocations() {
   const tbody = document.getElementById("locationTableBody");
@@ -271,7 +432,7 @@ function renderLocations() {
 }
 
 async function openAddLocationModal() {
-  const name = prompt("Nhập tên Vị trí / Kho mới (Ví dụ: Tòa nhà B - Phòng Lab 3, Kho Tầng 2):");
+  const name = prompt("Nhập tên Vị trí / Kho mới:");
   if (!name || !name.trim()) return;
   await callMutate("location.add", { name: name.trim() });
   loadState();
@@ -290,9 +451,8 @@ async function deleteLocation(name) {
   loadState();
 }
 
-// NẠP DANH SÁCH DROPDOWN CHUẨN HÓA
+// NẠP DỮ LIỆU SELECT DROPDOWN
 function populateSelects() {
-  // Dropdown danh mục
   const catOptions = STATE.categories.map(c => `<option value="${c}">${c}</option>`).join("");
   const devCat = document.getElementById("devCategory");
   if (devCat) devCat.innerHTML = catOptions;
@@ -300,7 +460,6 @@ function populateSelects() {
   const filterCat = document.getElementById("filterCategory");
   if (filterCat) filterCat.innerHTML = `<option value="">-- Tất cả danh mục --</option>` + catOptions;
 
-  // Dropdown vị trí & kho
   const locOptions = STATE.locations.map(l => `<option value="${l}">${l}</option>`).join("");
   const devLoc = document.getElementById("devLocation");
   if (devLoc) devLoc.innerHTML = locOptions;
@@ -314,7 +473,6 @@ function populateSelects() {
   const filterLoc = document.getElementById("filterLocation");
   if (filterLoc) filterLoc.innerHTML = `<option value="">-- Tất cả vị trí & kho --</option>` + locOptions;
 
-  // Dropdown thiết bị
   const movDev = document.getElementById("movDeviceCode");
   if (movDev) movDev.innerHTML = STATE.devices.map(d => `<option value="${d.code}">${d.code} - ${d.name} (${d.location || 'Chưa gán'})</option>`).join("");
 }
@@ -456,9 +614,10 @@ function closeScannerModal() {
 }
 
 function handleScannedResult(code) {
+  const cleanCode = String(code).trim().toLowerCase();
   const dev = STATE.devices.find(d => 
-    d.code.toLowerCase() === code.toLowerCase() || 
-    (d.serial && d.serial.toLowerCase() === code.toLowerCase())
+    String(d.code).trim().toLowerCase() === cleanCode || 
+    (d.serial && String(d.serial).trim().toLowerCase() === cleanCode)
   );
 
   if (dev) {
@@ -512,134 +671,6 @@ async function deleteCategory(name) {
   if (!confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}"?`)) return;
   await callMutate("category.delete", { name });
   loadState();
-}
-
-// THIẾT BỊ
-function openDeviceModal(code = null) {
-  document.getElementById("deviceModal").classList.remove("hidden");
-  if (code) {
-    const dev = STATE.devices.find(d => d.code === code);
-    document.getElementById("deviceModalTitle").innerText = "Chỉnh sửa hồ sơ thiết bị";
-    document.getElementById("devCode").value = dev.code;
-    document.getElementById("devCode").readOnly = true;
-    document.getElementById("devName").value = dev.name;
-    document.getElementById("devModel").value = dev.model || "";
-    document.getElementById("devSerial").value = dev.serial || "";
-    document.getElementById("devCategory").value = dev.category;
-    document.getElementById("devLocation").value = dev.location || STATE.locations[0];
-    document.getElementById("devStatus").value = dev.status || "Trong kho";
-    document.getElementById("devNotes").value = dev.notes || "";
-  } else {
-    document.getElementById("deviceModalTitle").innerText = "Thêm thiết bị mới";
-    document.getElementById("devCode").value = "";
-    document.getElementById("devCode").readOnly = false;
-    document.getElementById("devName").value = "";
-    document.getElementById("devModel").value = "";
-    document.getElementById("devSerial").value = "";
-    document.getElementById("devLocation").value = STATE.locations[0] || "";
-    document.getElementById("devNotes").value = "";
-  }
-}
-
-function editDevice(code) { openDeviceModal(code); }
-
-async function handleSaveDevice(e) {
-  e.preventDefault();
-  const code = document.getElementById("devCode").value.trim();
-  const name = document.getElementById("devName").value.trim();
-  const model = document.getElementById("devModel").value.trim();
-  const serial = document.getElementById("devSerial").value.trim();
-  const category = document.getElementById("devCategory").value;
-  const location = document.getElementById("devLocation").value;
-  const status = document.getElementById("devStatus").value;
-  const notes = document.getElementById("devNotes").value.trim();
-  const isEdit = document.getElementById("devCode").readOnly;
-
-  const action = isEdit ? "device.update" : "device.add";
-  await callMutate(action, { code, name, model, serial, category, location, status, notes });
-  closeModal("deviceModal");
-  loadState();
-}
-
-async function deleteDevice(code) {
-  if (!confirm(`Bạn có chắc chắn muốn xóa thiết bị [${code}]?`)) return;
-  await callMutate("device.delete", { code });
-  loadState();
-}
-
-function openMovementModal(preSelectCode = null) {
-  document.getElementById("movementModal").classList.remove("hidden");
-  if (preSelectCode) document.getElementById("movDeviceCode").value = preSelectCode;
-  handleMovementTypeChange();
-}
-
-function quickAction(code) { openMovementModal(code); }
-function handleSelectDeviceForMovement() { handleMovementTypeChange(); }
-
-function handleMovementTypeChange() {
-  const type = document.getElementById("movType").value;
-  const devCode = document.getElementById("movDeviceCode").value;
-  const dev = STATE.devices.find(d => d.code === devCode);
-  const toLocSelect = document.getElementById("movToLocation");
-  const noteInput = document.getElementById("movNote");
-
-  if (type === "Báo hỏng / Đi bảo hành") {
-    const loc = STATE.locations.find(l => l.includes("Kho")) || STATE.locations[0];
-    if (loc) toLocSelect.value = loc;
-    noteInput.placeholder = "VD: Cháy nguồn, hỏng quạt...";
-  } else if (type === "Đã sửa xong / Nhập lại kho") {
-    const loc = STATE.locations.find(l => l.includes("dự phòng") || l.includes("Kho")) || STATE.locations[0];
-    if (loc) toLocSelect.value = loc;
-    noteInput.placeholder = "VD: Đã thay linh kiện, hoạt động tốt";
-  } else if (type === "Báo thanh lý") {
-    const loc = STATE.locations.find(l => l.includes("thanh lý")) || STATE.locations[0];
-    if (loc) toLocSelect.value = loc;
-    noteInput.placeholder = "VD: Hỏng bo mạch chính không thể sửa...";
-  } else {
-    if (dev?.location) toLocSelect.value = dev.location;
-    noteInput.placeholder = "Ghi chú thêm...";
-  }
-}
-
-async function handleSaveMovement(e) {
-  e.preventDefault();
-  const deviceCode = document.getElementById("movDeviceCode").value;
-  const type = document.getElementById("movType").value;
-  const toLocation = document.getElementById("movToLocation").value;
-  const note = document.getElementById("movNote").value.trim();
-  const dev = STATE.devices.find(d => d.code === deviceCode);
-
-  let newStatus = "Đang sử dụng";
-  if (type === "Báo hỏng / Đi bảo hành") newStatus = "Hỏng / Bảo hành";
-  else if (type === "Đã sửa xong / Nhập lại kho") newStatus = "Trong kho";
-  else if (type === "Báo thanh lý") newStatus = "Thanh lý";
-
-  await callMutate("movement.create", {
-    deviceCode,
-    type,
-    fromLocation: dev ? dev.location : "",
-    toLocation,
-    status: newStatus,
-    note
-  });
-
-  closeModal("movementModal");
-  loadState();
-}
-
-function renderMovements() {
-  const tbody = document.getElementById("movementTableBody");
-  tbody.innerHTML = STATE.movements.map(m => `
-    <tr>
-      <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
-      <td><b>${m.deviceCode}</b></td>
-      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span></td>
-      <td>${m.fromLocation || "-"}</td>
-      <td><b>${m.toLocation || "-"}</b></td>
-      <td><small>${m.note || "-"}</small></td>
-      <td>${m.createdBy || "-"}</td>
-    </tr>
-  `).join("");
 }
 
 async function callMutate(action, payload) {
