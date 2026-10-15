@@ -9,7 +9,7 @@ let STATE = {
 let selectedCodes = new Set();
 let html5QrCode = null;
 
-// Hàm gán giá trị an toàn: hỗ trợ cả <input> và <select>, không bao giờ bị đứng code
+// Gán dữ liệu an toàn cho cả thẻ <input> và <select>
 function setElementValueSafe(id, val, isSelect = false) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -21,6 +21,22 @@ function setElementValueSafe(id, val, isSelect = false) {
   } else {
     el.value = val || "";
   }
+}
+
+// Bật Modal chắc chắn hiển thị
+function showModalById(id) {
+  const m = document.getElementById(id);
+  if (!m) return;
+  m.classList.remove("hidden");
+  m.style.display = "flex";
+}
+
+// Đóng Modal chắc chắn ẩn
+function closeModal(id) {
+  const m = document.getElementById(id);
+  if (!m) return;
+  m.classList.add("hidden");
+  m.style.display = "none";
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -42,11 +58,17 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function showView(viewId) {
-  document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
+  document.querySelectorAll(".view").forEach(v => {
+    v.classList.add("hidden");
+    v.style.display = "none";
+  });
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
 
   const target = document.getElementById(viewId);
-  if (target) target.classList.remove("hidden");
+  if (target) {
+    target.classList.remove("hidden");
+    target.style.display = "block";
+  }
 
   const btn = Array.from(document.querySelectorAll(".nav-btn")).find(b => b.getAttribute("onclick")?.includes(viewId));
   if (btn) btn.classList.add("active");
@@ -172,7 +194,7 @@ function getFilteredDevices() {
   const cat = document.getElementById("filterCategory")?.value || "";
   const loc = document.getElementById("filterLocation")?.value || "";
 
-  return STATE.devices.map((d, index) => ({ ...d, _origIdx: index })).filter(d => {
+  return STATE.devices.map((d, index) => ({ ...d, _idx: index })).filter(d => {
     const matchQ = !q || (
       (d.code || "").toLowerCase().includes(q) ||
       (d.name || "").toLowerCase().includes(q) ||
@@ -203,12 +225,13 @@ function renderDevices() {
 
   tbody.innerHTML = filtered.map(d => {
     const isChecked = selectedCodes.has(d.code);
-    const idx = d._origIdx;
+    const idx = d._idx;
+    const cleanCode = (d.code || "").replace(/'/g, "\\'");
     return `
       <tr>
         ${isAdmin ? `
           <td>
-            <input type="checkbox" class="dev-check" value="\${d.code}" ${isChecked ? 'checked' : ''} onchange="toggleSelectDevice('${d.code}', this.checked)">
+            <input type="checkbox" class="dev-check" value="\${d.code}" ${isChecked ? 'checked' : ''} onchange="toggleSelectDevice('${cleanCode}', this.checked)">
           </td>` : `<td></td>`}
         <td><b>${d.code}</b></td>
         <td>
@@ -227,9 +250,9 @@ function renderDevices() {
         </td>
         ${isAdmin ? `
           <td style="text-align:right; white-space:nowrap;">
-            <button type="button" onclick="quickActionByIndex(\${idx})" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
-            <button type="button" onclick="editDeviceByIndex(\${idx})" style="cursor:pointer; margin-right:4px;">Sửa</button>
-            <button type="button" onclick="deleteDeviceByIndex(\${idx})" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" onclick="quickAction(\${idx})" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
+            <button type="button" onclick="editDevice(\${idx})" style="cursor:pointer; margin-right:4px;">Sửa</button>
+            <button type="button" onclick="deleteDevice(\${idx})" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -268,29 +291,37 @@ function updateFloatingBar() {
   if (selectedCodes.size > 0 && STATE.currentUser?.role === "admin") {
     if (countEl) countEl.innerText = selectedCodes.size;
     bar.classList.remove("hidden");
+    bar.style.display = "flex";
   } else {
     bar.classList.add("hidden");
+    bar.style.display = "none";
   }
 }
 
 // ----------------------------------------------------
-// POP-UP SỬA / THÊM THIẾT BỊ (ĐẢM BẢO 100% BẬT FORM LÊN)
+// HÀM TÌM THIẾT BỊ ĐA NĂNG (THEO INDEX HOẶC CODE)
 // ----------------------------------------------------
-function openDeviceModal(deviceIndex = null) {
-  try {
-    populateSelects();
-  } catch (e) {
-    console.warn("Lỗi nạp danh sách dropdown:", e);
+function findDeviceTarget(target) {
+  if (target === null || target === undefined) return null;
+  if (typeof target === "number") {
+    return STATE.devices[target] || null;
   }
+  const clean = String(target).trim().toLowerCase();
+  return STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean) || null;
+}
 
-  const modal = document.getElementById("deviceModal");
-  if (modal) modal.classList.remove("hidden");
+// ----------------------------------------------------
+// SỬA / THÊM THIẾT BỊ
+// ----------------------------------------------------
+function openDeviceModal(target = null) {
+  populateSelects();
+  showModalById("deviceModal");
 
   const titleEl = document.getElementById("deviceModalTitle");
   const codeEl = document.getElementById("devCode");
+  const dev = findDeviceTarget(target);
 
-  if (deviceIndex !== null && typeof deviceIndex === "number" && STATE.devices[deviceIndex]) {
-    const dev = STATE.devices[deviceIndex];
+  if (dev) {
     if (titleEl) titleEl.innerText = "Chỉnh sửa hồ sơ thiết bị";
     if (codeEl) {
       codeEl.value = dev.code || "";
@@ -303,34 +334,33 @@ function openDeviceModal(deviceIndex = null) {
     setElementValueSafe("devLocation", dev.location || "", true);
     setElementValueSafe("devStatus", dev.status || "Trong kho", true);
     setElementValueSafe("devNotes", dev.notes || "");
-    return;
+  } else {
+    if (titleEl) titleEl.innerText = "Thêm thiết bị mới";
+    if (codeEl) {
+      codeEl.value = typeof target === "string" ? target : "";
+      codeEl.readOnly = false;
+    }
+    setElementValueSafe("devName", "");
+    setElementValueSafe("devModel", "");
+    setElementValueSafe("devSerial", "");
+    setElementValueSafe("devCategory", STATE.categories[0] || "", true);
+    setElementValueSafe("devLocation", STATE.locations[0] || "", true);
+    setElementValueSafe("devStatus", "Trong kho", true);
+    setElementValueSafe("devNotes", "");
   }
-
-  // Chế độ Thêm mới
-  if (titleEl) titleEl.innerText = "Thêm thiết bị mới";
-  if (codeEl) {
-    codeEl.value = "";
-    codeEl.readOnly = false;
-  }
-  setElementValueSafe("devName", "");
-  setElementValueSafe("devModel", "");
-  setElementValueSafe("devSerial", "");
-  setElementValueSafe("devCategory", STATE.categories[0] || "", true);
-  setElementValueSafe("devLocation", STATE.locations[0] || "", true);
-  setElementValueSafe("devStatus", "Trong kho", true);
-  setElementValueSafe("devNotes", "");
 }
 
-function editDeviceByIndex(index) {
-  openDeviceModal(index);
-}
+// Đăng ký cả 2 tên hàm lên window để không bị lỗi cache
+window.editDevice = function(target) { openDeviceModal(target); };
+window.editDeviceByIndex = function(idx) { openDeviceModal(idx); };
 
-function deleteDeviceByIndex(index) {
-  const dev = STATE.devices[index];
+window.deleteDevice = function(target) {
+  const dev = findDeviceTarget(target);
   if (!dev) return;
   if (!confirm(`Bạn có chắc chắn muốn xóa thiết bị [${dev.code}]?`)) return;
   callMutate("device.delete", { code: dev.code }).then(() => loadState());
-}
+};
+window.deleteDeviceByIndex = window.deleteDevice;
 
 async function handleSaveDevice(e) {
   e.preventDefault();
@@ -351,20 +381,14 @@ async function handleSaveDevice(e) {
 }
 
 // ----------------------------------------------------
-// THAO TÁC ĐIỀU CHUYỂN / BÁO SỰ CỐ
+// ĐIỀU CHUYỂN / BÁO SỰ CỐ
 // ----------------------------------------------------
-function openMovementModal(deviceIndex = null) {
-  try {
-    populateSelects();
-  } catch (e) {
-    console.warn("Lỗi nạp danh sách dropdown:", e);
-  }
+function openMovementModal(target = null) {
+  populateSelects();
+  showModalById("movementModal");
 
-  const modal = document.getElementById("movementModal");
-  if (modal) modal.classList.remove("hidden");
-
-  if (deviceIndex !== null && typeof deviceIndex === "number" && STATE.devices[deviceIndex]) {
-    const dev = STATE.devices[deviceIndex];
+  const dev = findDeviceTarget(target);
+  if (dev) {
     setElementValueSafe("movDeviceCode", dev.code, true);
     setElementValueSafe("movToLocation", dev.location || "", true);
   }
@@ -372,9 +396,8 @@ function openMovementModal(deviceIndex = null) {
   handleMovementTypeChange();
 }
 
-function quickActionByIndex(index) {
-  openMovementModal(index);
-}
+window.quickAction = function(target) { openMovementModal(target); };
+window.quickActionByIndex = function(idx) { openMovementModal(idx); };
 
 function handleSelectDeviceForMovement() {
   handleMovementTypeChange();
@@ -493,7 +516,7 @@ async function deleteLocation(name) {
   loadState();
 }
 
-// NẠP DỮ LIỆU SELECT DROPDOWN AN TOÀN
+// NẠP DỮ LIỆU SELECT DROPDOWN
 function populateSelects() {
   const catOptions = STATE.categories.map(c => `<option value="${c}">${c}</option>`).join("");
   const devCat = document.getElementById("devCategory");
@@ -523,8 +546,7 @@ function populateSelects() {
 
 // ĐIỀU CHUYỂN HÀNG LOẠT
 function openBulkMovementModal() {
-  const modal = document.getElementById("bulkMovementModal");
-  if (modal) modal.classList.remove("hidden");
+  showModalById("bulkMovementModal");
   const desc = document.getElementById("bulkModalDesc");
   if (desc) desc.innerText = `Đang thao tác cho ${selectedCodes.size} thiết bị đã chọn`;
 }
@@ -630,8 +652,7 @@ function downloadSampleCSV() {
 
 // QUÉT QR
 function openScannerModal() {
-  const modal = document.getElementById("scannerModal");
-  if (modal) modal.classList.remove("hidden");
+  showModalById("scannerModal");
   if (!html5QrCode) html5QrCode = new Html5Qrcode("qr-reader");
 
   html5QrCode.start(
@@ -649,15 +670,14 @@ function openScannerModal() {
 }
 
 function closeScannerModal() {
-  const modal = document.getElementById("scannerModal");
   if (html5QrCode && html5QrCode.isScanning) {
     html5QrCode.stop().then(() => {
-      if (modal) modal.classList.add("hidden");
+      closeModal("scannerModal");
     }).catch(() => {
-      if (modal) modal.classList.add("hidden");
+      closeModal("scannerModal");
     });
   } else {
-    if (modal) modal.classList.add("hidden");
+    closeModal("scannerModal");
   }
 }
 
@@ -669,11 +689,10 @@ function handleScannedResult(code) {
   );
 
   if (devIdx !== -1) {
-    quickActionByIndex(devIdx);
+    quickAction(devIdx);
   } else {
     if (confirm(`Mã [${code}] chưa có trong hệ thống. Bạn có muốn thêm mới thiết bị với mã này không?`)) {
-      openDeviceModal();
-      setElementValueSafe("devCode", code);
+      openDeviceModal(code);
     }
   }
 }
@@ -781,7 +800,7 @@ function exportMovementsCSV() {
   downloadCSV(`lich_su_dieu_chuyen_${new Date().toISOString().slice(0,10)}.csv`, rows);
 }
 
-// USER
+// QUẢN TRỊ USER
 async function loadUsers() {
   const token = localStorage.getItem("kho_token");
   try {
@@ -811,8 +830,7 @@ async function loadUsers() {
 }
 
 function openUserModal() {
-  const modal = document.getElementById("userModal");
-  if (modal) modal.classList.remove("hidden");
+  showModalById("userModal");
   const u = document.getElementById("usrUsername"); if (u) { u.value = ""; u.readOnly = false; }
   const p = document.getElementById("usrPassword"); if (p) p.value = "";
   const d = document.getElementById("usrDisplayName"); if (d) d.value = "";
@@ -868,9 +886,4 @@ async function deleteUser(username) {
   } else {
     alert("Lỗi: " + (data.error || "Không thể xóa"));
   }
-}
-
-function closeModal(id) {
-  const modal = document.getElementById(id);
-  if (modal) modal.classList.add("hidden");
 }
