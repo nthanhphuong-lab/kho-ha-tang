@@ -46,3 +46,72 @@ label { display:block;font-size:.9rem;font-weight:600;margin-top:8px; } .muted {
 .floating-bar.active { display:flex!important; } .floating-bar span { font-size:.95rem; }
 @media(max-width:900px) { #app { flex-direction:column; } .sidebar { width:100%;padding:1rem; } .nav-menu { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); } main { padding:1rem; } .stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .filter-bar { grid-template-columns:1fr; } .floating-bar { flex-wrap:wrap;justify-content:center;border-radius:16px;bottom:10px; } }
 @media(max-width:480px) { .stats-grid { grid-template-columns:1fr 1fr;gap:.6rem; } .stat-card { padding:1rem; } .stat-card h2 { font-size:1.5rem; } .login-card { padding:1.5rem; } }
+
+/* Bảng thiết bị: hiển thị đủ cột trong khung, không cần cuộn ngang */
+#devices .table-card {
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+#devices .table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+#devices .table th,
+#devices .table td {
+  padding: 8px 6px;
+  font-size: .78rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  vertical-align: top;
+}
+#devices .table th {
+  line-height: 1.25;
+}
+#devices .table th:nth-child(1),
+#devices .table td:nth-child(1) { width: 4%; }
+#devices .table th:nth-child(2),
+#devices .table td:nth-child(2) { width: 8%; }
+#devices .table th:nth-child(3),
+#devices .table td:nth-child(3) { width: 16%; }
+#devices .table th:nth-child(4),
+#devices .table td:nth-child(4) { width: 10%; }
+#devices .table th:nth-child(5),
+#devices .table td:nth-child(5) { width: 11%; }
+#devices .table th:nth-child(6),
+#devices .table td:nth-child(6) { width: 10%; }
+#devices .table th:nth-child(7),
+#devices .table td:nth-child(7) { width: 11%; }
+#devices .table th:nth-child(8),
+#devices .table td:nth-child(8) { width: 10%; }
+#devices .table th:nth-child(9),
+#devices .table td:nth-child(9) { width: 20%; }
+#devices .table td code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: .72rem;
+}
+#devices .table td .badge {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 3px 6px;
+  font-size: .7rem;
+}
+#devices .table td button {
+  white-space: normal;
+  padding: 5px 6px;
+  margin: 2px 2px 2px 0 !important;
+  font-size: .7rem;
+  line-height: 1.25;
+}
+@media (max-width: 900px) {
+  #devices .table th,
+  #devices .table td { padding: 6px 4px; font-size: .72rem; }
+  #devices .table td button { font-size: .65rem; padding: 4px; }
+}
+@media (max-width: 600px) {
+  #devices .table th,
+  #devices .table td { padding: 5px 3px; font-size: .66rem; }
+  #devices .table td button { display: block; width: 100%; margin: 2px 0 !important; font-size: .64rem; }
+}
