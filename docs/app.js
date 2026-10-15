@@ -23,18 +23,18 @@ function setElementValueSafe(id, val, isSelect = false) {
   }
 }
 
+// Bật Modal bằng class .active
 function showModalById(id) {
   const m = document.getElementById(id);
   if (!m) return;
-  m.classList.remove("hidden");
-  m.style.setProperty("display", "flex", "important");
+  m.classList.add("active");
 }
 
+// Đóng Modal bằng class .active
 function closeModal(id) {
   const m = document.getElementById(id);
   if (!m) return;
-  m.classList.add("hidden");
-  m.style.setProperty("display", "none", "important");
+  m.classList.remove("active");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -58,14 +58,12 @@ document.addEventListener("DOMContentLoaded", () => {
 function showView(viewId) {
   document.querySelectorAll(".view").forEach(v => {
     v.classList.add("hidden");
-    v.style.display = "none";
   });
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
 
   const target = document.getElementById(viewId);
   if (target) {
     target.classList.remove("hidden");
-    target.style.display = "block";
   }
 
   const btn = Array.from(document.querySelectorAll(".nav-btn")).find(b => b.getAttribute("onclick")?.includes(viewId));
@@ -258,7 +256,6 @@ function renderDevices() {
   updateFloatingBar();
 }
 
-// Hàm điều phối hành động thiết bị trực tiếp - gọi chuẩn 100%
 window.handleDeviceAction = function(action, idx) {
   if (action === "edit") {
     openDeviceModal(idx);
@@ -298,11 +295,9 @@ function updateFloatingBar() {
 
   if (selectedCodes.size > 0 && STATE.currentUser?.role === "admin") {
     if (countEl) countEl.innerText = selectedCodes.size;
-    bar.classList.remove("hidden");
-    bar.style.display = "flex";
+    bar.classList.add("active");
   } else {
-    bar.classList.add("hidden");
-    bar.style.display = "none";
+    bar.classList.remove("active");
   }
 }
 
@@ -468,7 +463,7 @@ function renderLocations() {
   const isAdmin = STATE.currentUser?.role === "admin";
 
   tbody.innerHTML = STATE.locations.map((loc, idx) => {
-    const count = STATE.devices.filter(d => d.location === loc).length;
+    const count = STATE.devices.filter(d => String(d.location).trim().toLowerCase() === String(loc).trim().toLowerCase()).length;
     return `
       <tr>
         <td>${idx + 1}</td>
@@ -476,8 +471,8 @@ function renderLocations() {
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
-            <button type="button" onclick="renameLocation('\${loc}')" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
-            <button type="button" onclick="deleteLocation('\${loc}')" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" onclick="renameLocation('\${loc.replace(/'/g, "\\'")}')" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button type="button" onclick="deleteLocation('\${loc.replace(/'/g, "\\'")}')" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -488,20 +483,20 @@ async function openAddLocationModal() {
   const name = prompt("Nhập tên Vị trí / Kho mới:");
   if (!name || !name.trim()) return;
   await callMutate("location.add", { name: name.trim() });
-  loadState();
+  await loadState();
 }
 
 async function renameLocation(oldName) {
   const newName = prompt(`Đổi tên vị trí/kho "${oldName}" thành:`, oldName);
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
   await callMutate("location.update", { oldName, newName: newName.trim() });
-  loadState();
+  await loadState();
 }
 
 async function deleteLocation(name) {
   if (!confirm(`Bạn có chắc muốn xóa vị trí "${name}"?`)) return;
   await callMutate("location.delete", { name });
-  loadState();
+  await loadState();
 }
 
 // NẠP DỮ LIỆU SELECT DROPDOWN
@@ -692,7 +687,7 @@ function renderCategories() {
   const isAdmin = STATE.currentUser?.role === "admin";
 
   tbody.innerHTML = STATE.categories.map((cat, idx) => {
-    const count = STATE.devices.filter(d => d.category === cat).length;
+    const count = STATE.devices.filter(d => String(d.category).trim().toLowerCase() === String(cat).trim().toLowerCase()).length;
     return `
       <tr>
         <td>${idx + 1}</td>
@@ -700,8 +695,8 @@ function renderCategories() {
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
-            <button type="button" onclick="renameCategory('\${cat}')" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
-            <button type="button" onclick="deleteCategory('\${cat}')" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" onclick="renameCategory('\${cat.replace(/'/g, "\\'")}')" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button type="button" onclick="deleteCategory('\${cat.replace(/'/g, "\\'")}')" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -712,20 +707,20 @@ async function openAddCategoryModal() {
   const name = prompt("Nhập tên danh mục mới:");
   if (!name || !name.trim()) return;
   await callMutate("category.add", { name: name.trim() });
-  loadState();
+  await loadState();
 }
 
 async function renameCategory(oldName) {
   const newName = prompt(`Đổi tên danh mục "${oldName}" thành:`, oldName);
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
   await callMutate("category.update", { oldName, newName: newName.trim() });
-  loadState();
+  await loadState();
 }
 
 async function deleteCategory(name) {
-  if (!confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) return;
+  if (!confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}"?`)) return;
   await callMutate("category.delete", { name });
-  loadState();
+  await loadState();
 }
 
 async function callMutate(action, payload) {
