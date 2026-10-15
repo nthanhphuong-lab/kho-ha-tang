@@ -23,7 +23,7 @@ function setElementValueSafe(id, val, isSelect = false) {
   }
 }
 
-// Bật Modal bằng class .active
+// Bật Modal chắc chắn hiển thị
 function showModalById(id) {
   const m = document.getElementById(id);
   if (!m) return;
@@ -32,7 +32,7 @@ function showModalById(id) {
   m.style.setProperty("display", "flex", "important");
 }
 
-// Đóng Modal an toàn
+// Đóng Modal
 function closeModal(id) {
   const m = document.getElementById(id);
   if (!m) return;
@@ -41,42 +41,78 @@ function closeModal(id) {
   m.style.setProperty("display", "none", "important");
 }
 
-// BỘ LẮNG NGHE SỰ KIỆN CLICK TẬP TRUNG (LOẠI BỎ HOÀN TOÀN LỖI CÚ PHÁP CHUỖI)
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-act]");
-  if (!btn) return;
-
-  const act = btn.getAttribute("data-act");
-  const val = btn.getAttribute("data-val") || "";
-
-  if (act === "edit-dev") {
-    openDeviceModal(val);
-  } else if (act === "quick-mov") {
-    openMovementModal(val);
-  } else if (act === "del-dev") {
-    deleteDeviceByCode(val);
-  } else if (act === "rename-loc") {
-    renameLocation(val);
-  } else if (act === "del-loc") {
-    deleteLocation(val);
-  } else if (act === "rename-cat") {
-    renameCategory(val);
-  } else if (act === "del-cat") {
-    deleteCategory(val);
-  }
-});
-
-// LẮNG NGHE SỰ KIỆN CHỌN CHECKBOX THIẾT BỊ
-document.addEventListener("change", (e) => {
-  const chk = e.target.closest("input.dev-check");
-  if (chk) {
-    toggleSelectDevice(chk.value, chk.checked);
-  }
-});
-
 document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("kho_token");
   const cachedUser = localStorage.getItem("kho_user");
+
+  // GẮN SỰ KIỆN CLICK TRỰC TIẾP LÊN BẢNG THIẾT BỊ
+  const devTbody = document.getElementById("deviceTableBody");
+  if (devTbody) {
+    devTbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const act = btn.getAttribute("data-act");
+      const code = btn.getAttribute("data-val") || "";
+
+      if (act === "edit-dev") {
+        openDeviceModal(code);
+      } else if (act === "quick-mov") {
+        openMovementModal(code);
+      } else if (act === "del-dev") {
+        deleteDeviceByCode(code);
+      }
+    });
+
+    devTbody.addEventListener("change", (e) => {
+      const chk = e.target.closest("input.dev-check");
+      if (chk) {
+        toggleSelectDevice(chk.value, chk.checked);
+      }
+    });
+  }
+
+  // GẮN SỰ KIỆN CLICK TRỰC TIẾP LÊN BẢNG VỊ TRÍ
+  const locTbody = document.getElementById("locationTableBody");
+  if (locTbody) {
+    locTbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const act = btn.getAttribute("data-act");
+      const val = btn.getAttribute("data-val") || "";
+
+      if (act === "rename-loc") {
+        renameLocation(val);
+      } else if (act === "del-loc") {
+        deleteLocation(val);
+      }
+    });
+  }
+
+  // GẮN SỰ KIỆN CLICK TRỰC TIẾP LÊN BẢNG DANH MỤC
+  const catTbody = document.getElementById("categoryTableBody");
+  if (catTbody) {
+    catTbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const act = btn.getAttribute("data-act");
+      const val = btn.getAttribute("data-val") || "";
+
+      if (act === "rename-cat") {
+        renameCategory(val);
+      } else if (act === "del-cat") {
+        deleteCategory(val);
+      }
+    });
+  }
 
   if (token && cachedUser) {
     try {
@@ -378,9 +414,14 @@ function openDeviceModal(deviceCode = null) {
   setElementValueSafe("devNotes", "");
 }
 
-function deleteDeviceByCode(code) {
+async function deleteDeviceByCode(code) {
   if (!confirm(`Bạn có chắc chắn muốn xóa thiết bị [${code}]?`)) return;
-  callMutate("device.delete", { code }).then(() => loadState());
+  try {
+    await callMutate("device.delete", { code });
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 async function handleSaveDevice(e) {
@@ -396,9 +437,13 @@ async function handleSaveDevice(e) {
   const isEdit = document.getElementById("devCode")?.readOnly;
 
   const action = isEdit ? "device.update" : "device.add";
-  await callMutate(action, { code, name, model, serial, category, location, status, notes });
-  closeModal("deviceModal");
-  loadState();
+  try {
+    await callMutate(action, { code, name, model, serial, category, location, status, notes });
+    closeModal("deviceModal");
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 // ----------------------------------------------------
@@ -468,17 +513,20 @@ async function handleSaveMovement(e) {
   else if (type === "Báo thanh lý") newStatus = "Thanh lý";
   else if (type === "Xuất kho") newStatus = "Đang sử dụng";
 
-  await callMutate("movement.create", {
-    deviceCode,
-    type,
-    fromLocation: dev ? dev.location : "",
-    toLocation,
-    status: newStatus,
-    note
-  });
-
-  closeModal("movementModal");
-  loadState();
+  try {
+    await callMutate("movement.create", {
+      deviceCode,
+      type,
+      fromLocation: dev ? dev.location : "",
+      toLocation,
+      status: newStatus,
+      note
+    });
+    closeModal("movementModal");
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function renderMovements() {
@@ -527,21 +575,33 @@ function renderLocations() {
 async function openAddLocationModal() {
   const name = prompt("Nhập tên Vị trí / Kho mới:");
   if (!name || !name.trim()) return;
-  await callMutate("location.add", { name: name.trim() });
-  await loadState();
+  try {
+    await callMutate("location.add", { name: name.trim() });
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 async function renameLocation(oldName) {
   const newName = prompt(`Đổi tên vị trí/kho "${oldName}" thành:`, oldName);
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
-  await callMutate("location.update", { oldName, newName: newName.trim() });
-  await loadState();
+  try {
+    await callMutate("location.update", { oldName: oldName.trim(), newName: newName.trim() });
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 async function deleteLocation(name) {
   if (!confirm(`Bạn có chắc muốn xóa vị trí "${name}"?`)) return;
-  await callMutate("location.delete", { name });
-  await loadState();
+  try {
+    await callMutate("location.delete", { name: name.trim() });
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 // ----------------------------------------------------
@@ -574,21 +634,33 @@ function renderCategories() {
 async function openAddCategoryModal() {
   const name = prompt("Nhập tên danh mục mới:");
   if (!name || !name.trim()) return;
-  await callMutate("category.add", { name: name.trim() });
-  await loadState();
+  try {
+    await callMutate("category.add", { name: name.trim() });
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 async function renameCategory(oldName) {
   const newName = prompt(`Đổi tên danh mục "${oldName}" thành:`, oldName);
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
-  await callMutate("category.update", { oldName, newName: newName.trim() });
-  await loadState();
+  try {
+    await callMutate("category.update", { oldName: oldName.trim(), newName: newName.trim() });
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 async function deleteCategory(name) {
-  if (!confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}"?`)) return;
-  await callMutate("category.delete", { name });
-  await loadState();
+  if (!confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) return;
+  try {
+    await callMutate("category.delete", { name: name.trim() });
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 // NẠP DỮ LIỆU SELECT DROPDOWN
@@ -645,24 +717,31 @@ async function handleSaveBulkMovement(e) {
   else if (type === "Đã sửa xong / Nhập lại kho") status = "Trong kho";
   else if (type === "Báo thanh lý") status = "Thanh lý";
 
-  await callMutate("movement.bulk_create", {
-    codes: Array.from(selectedCodes),
-    type,
-    toLocation,
-    status,
-    note
-  });
-
-  closeModal("bulkMovementModal");
-  clearSelected();
-  loadState();
+  try {
+    await callMutate("movement.bulk_create", {
+      codes: Array.from(selectedCodes),
+      type,
+      toLocation,
+      status,
+      note
+    });
+    closeModal("bulkMovementModal");
+    clearSelected();
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 async function bulkDeleteDevices() {
   if (!confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedCodes.size} thiết bị đã chọn?`)) return;
-  await callMutate("device.delete", { codes: Array.from(selectedCodes) });
-  clearSelected();
-  loadState();
+  try {
+    await callMutate("device.delete", { codes: Array.from(selectedCodes) });
+    clearSelected();
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 // NHẬP CSV
@@ -709,9 +788,13 @@ async function parseAndImportCSV(csvText) {
 
   const statusEl = document.getElementById("syncStatus");
   if (statusEl) statusEl.innerText = "Đang nạp dữ liệu...";
-  await callMutate("device.bulk_add", { items });
-  alert(`Đã nạp thành công thiết bị vào hệ thống!`);
-  loadState();
+  try {
+    await callMutate("device.bulk_add", { items });
+    alert(`Đã nạp thành công thiết bị vào hệ thống!`);
+    await loadState();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function downloadSampleCSV() {
