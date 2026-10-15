@@ -9,7 +9,7 @@ let STATE = {
 let selectedCodes = new Set();
 let html5QrCode = null;
 
-// Gán dữ liệu an toàn cho cả thẻ <input> và <select>
+// Gán dữ liệu an toàn cho thẻ input và select
 function setElementValueSafe(id, val, isSelect = false) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -23,45 +23,23 @@ function setElementValueSafe(id, val, isSelect = false) {
   }
 }
 
-// Bật Modal
 function showModalById(id) {
   const m = document.getElementById(id);
   if (!m) return;
   m.classList.remove("hidden");
-  m.style.display = "flex";
+  m.style.setProperty("display", "flex", "important");
 }
 
-// Đóng Modal
 function closeModal(id) {
   const m = document.getElementById(id);
   if (!m) return;
   m.classList.add("hidden");
-  m.style.display = "none";
+  m.style.setProperty("display", "none", "important");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("kho_token");
   const cachedUser = localStorage.getItem("kho_user");
-
-  // Gán sự kiện click an toàn cho bảng thiết bị (loại bỏ hoàn toàn lỗi inline onclick)
-  const tbody = document.getElementById("deviceTableBody");
-  if (tbody) {
-    tbody.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-action]");
-      if (!btn) return;
-      const action = btn.dataset.action;
-      const idx = parseInt(btn.dataset.index, 10);
-      if (isNaN(idx)) return;
-
-      if (action === "quickAction") {
-        openMovementModal(idx);
-      } else if (action === "edit") {
-        openDeviceModal(idx);
-      } else if (action === "delete") {
-        deleteDeviceByIndex(idx);
-      }
-    });
-  }
 
   if (token && cachedUser) {
     try {
@@ -269,9 +247,9 @@ function renderDevices() {
         </td>
         ${isAdmin ? `
           <td style="text-align:right; white-space:nowrap;">
-            <button type="button" data-action="quickAction" data-index="\${idx}" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
-            <button type="button" data-action="edit" data-index="\${idx}" style="cursor:pointer; margin-right:4px;">Sửa</button>
-            <button type="button" data-action="delete" data-index="\${idx}" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" onclick="handleDeviceAction('quickAction', \${idx})" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
+            <button type="button" onclick="handleDeviceAction('edit', \${idx})" style="cursor:pointer; margin-right:4px;">Sửa</button>
+            <button type="button" onclick="handleDeviceAction('delete', \${idx})" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -279,6 +257,17 @@ function renderDevices() {
 
   updateFloatingBar();
 }
+
+// Hàm điều phối hành động thiết bị trực tiếp - gọi chuẩn 100%
+window.handleDeviceAction = function(action, idx) {
+  if (action === "edit") {
+    openDeviceModal(idx);
+  } else if (action === "quickAction") {
+    openMovementModal(idx);
+  } else if (action === "delete") {
+    deleteDeviceByIndex(idx);
+  }
+};
 
 function toggleSelectDevice(code, isChecked) {
   if (isChecked) selectedCodes.add(code);
@@ -318,7 +307,7 @@ function updateFloatingBar() {
 }
 
 // ----------------------------------------------------
-// SỬA / THÊM THIẾT BỊ
+// POP-UP SỬA / THÊM THIẾT BỊ
 // ----------------------------------------------------
 function openDeviceModal(deviceIndex = null) {
   populateSelects();
@@ -734,7 +723,7 @@ async function renameCategory(oldName) {
 }
 
 async function deleteCategory(name) {
-  if (!confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}"?`)) return;
+  if (!confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) return;
   await callMutate("category.delete", { name });
   loadState();
 }
