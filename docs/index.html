@@ -17,7 +17,7 @@
       <p class="muted">Đăng nhập để xem và quản lý thiết bị hạ tầng</p>
       <form id="loginForm" onsubmit="handleLogin(event)">
         <label>Tên đăng nhập</label>
-        <input type="text" id="username" required placeholder="admin hoặc tên tài khoản">
+        <input type="text" id="username" required placeholder="admin hoặc user01">
         <label>Mật khẩu</label>
         <input type="password" id="password" required placeholder="••••••••">
         <button type="submit" class="primary" style="width:100%; margin-top:1rem;">Đăng nhập</button>
@@ -37,16 +37,26 @@
           <small id="userRoleBadge" class="muted">Quản trị viên</small>
         </div>
       </div>
-      <nav>
-        <button class="nav-btn active" onclick="showView('dashboard')">📊 Tổng quan</button>
-        <button class="nav-btn" onclick="showView('devices')">💻 Thiết bị</button>
-        <button class="nav-btn" onclick="showView('movements')">🔄 Xuất / Nhập</button>
-        <button class="nav-btn" onclick="showView('categories')">📁 Danh mục</button>
-        <button class="nav-btn admin-only" onclick="showView('users')">👥 Người dùng</button>
+      <nav class="nav-menu">
+        <button class="nav-btn active" onclick="showView('dashboard')">
+          <span class="icon">📊</span> <span>Tổng quan</span>
+        </button>
+        <button class="nav-btn" onclick="showView('devices')">
+          <span class="icon">💻</span> <span>Thiết bị</span>
+        </button>
+        <button class="nav-btn" onclick="showView('movements')">
+          <span class="icon">🔄</span> <span>Xuất / Nhập</span>
+        </button>
+        <button class="nav-btn" onclick="showView('categories')">
+          <span class="icon">📁</span> <span>Danh mục</span>
+        </button>
+        <button class="nav-btn admin-only" onclick="showView('users')">
+          <span class="icon">👥</span> <span>Người dùng</span>
+        </button>
       </nav>
       <div class="sidebar-footer">
-        <div id="currentUserName" style="font-weight:600; margin-bottom:5px;">Admin</div>
-        <button onclick="handleLogout()" class="secondary" style="width:100%;">Đăng xuất</button>
+        <div id="currentUserName" class="user-name">Admin</div>
+        <button onclick="handleLogout()" class="secondary logout-btn">Đăng xuất</button>
       </div>
     </aside>
 
@@ -87,10 +97,10 @@
       <!-- TAB 2: THIẾT BỊ -->
       <section id="devices" class="view hidden">
         <div class="toolbar">
-          <input type="text" id="deviceSearch" placeholder="Tìm kiếm theo mã, tên, serial..." oninput="renderDevices()">
+          <input type="text" id="deviceSearch" placeholder="Tìm kiếm theo mã, tên, vị trí..." oninput="renderDevices()">
           <button class="primary admin-only" onclick="openDeviceModal()">+ Thêm thiết bị</button>
         </div>
-        <div class="table-container card">
+        <div class="card table-card">
           <table class="table">
             <thead>
               <tr>
@@ -110,10 +120,13 @@
       <!-- TAB 3: XUẤT NHẬP -->
       <section id="movements" class="view hidden">
         <div class="toolbar">
-          <h2>Lịch sử xuất / nhập kho</h2>
+          <div>
+            <h2>Lịch sử xuất / nhập kho</h2>
+            <p class="muted">Theo dõi lịch sử dịch chuyển và bàn giao tài sản</p>
+          </div>
           <button class="primary admin-only" onclick="openMovementModal()">+ Tạo phiếu xuất/nhập</button>
         </div>
-        <div class="table-container card">
+        <div class="card table-card">
           <table class="table">
             <thead>
               <tr>
@@ -133,21 +146,21 @@
       <!-- TAB 4: DANH MỤC -->
       <section id="categories" class="view hidden">
         <div class="card">
-          <h2>Danh mục thiết bị</h2>
-          <ul id="categoryList" style="margin-top:1rem; padding-left:1.5rem; line-height:2;"></ul>
+          <h2>Danh mục phân loại thiết bị</h2>
+          <ul id="categoryList" class="category-list"></ul>
         </div>
       </section>
 
-      <!-- TAB 5: QUẢN LÝ NGƯỜI DÙNG (CHỈ ADMIN) -->
+      <!-- TAB 5: QUẢN LÝ NGƯỜI DÙNG -->
       <section id="users" class="view hidden">
         <div class="toolbar">
           <div>
             <h2>Quản trị người dùng</h2>
-            <p class="muted">Thêm tài khoản và phân quyền cho cán bộ vào xem hoặc chỉnh sửa kho</p>
+            <p class="muted">Thêm tài khoản và phân quyền cán bộ xem hoặc quản trị kho</p>
           </div>
           <button class="primary admin-only" onclick="openUserModal()">+ Thêm người dùng</button>
         </div>
-        <div class="table-container card">
+        <div class="card table-card">
           <table class="table">
             <thead>
               <tr>
@@ -184,7 +197,7 @@
           <option value="Hỏng / Bảo hành">Hỏng / Bảo hành</option>
           <option value="Thanh lý">Thanh lý</option>
         </select>
-        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:1.5rem;">
+        <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('deviceModal')">Hủy</button>
           <button type="submit" class="primary">Lưu thiết bị</button>
         </div>
@@ -198,17 +211,17 @@
       <h3 id="userModalTitle">Thêm người dùng mới</h3>
       <form onsubmit="handleSaveUser(event)">
         <label>Tên đăng nhập (*)</label>
-        <input type="text" id="usrUsername" required placeholder="VD: user01, phuong.nt...">
+        <input type="text" id="usrUsername" required placeholder="VD: user01, canbo01">
         <label>Mật khẩu (*)</label>
-        <input type="password" id="usrPassword" placeholder="Nhập mật khẩu mới">
+        <input type="password" id="usrPassword" placeholder="Nhập mật khẩu">
         <label>Tên hiển thị</label>
-        <input type="text" id="usrDisplayName" placeholder="VD: Cán bộ giám sát">
+        <input type="text" id="usrDisplayName" placeholder="VD: Cán bộ quản lý">
         <label>Quyền hạn</label>
         <select id="usrRole">
-          <option value="viewer">Người xem (Chỉ được xem, không được sửa)</option>
+          <option value="viewer">Người xem (Chỉ xem, không được thêm/sửa/xóa)</option>
           <option value="admin">Quản trị viên (Toàn quyền)</option>
         </select>
-        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:1.5rem;">
+        <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('userModal')">Hủy</button>
           <button type="submit" class="primary">Lưu người dùng</button>
         </div>
@@ -230,8 +243,8 @@
           <option value="Bảo hành">Đem đi sửa chữa / bảo hành</option>
         </select>
         <label>Đến vị trí mới</label>
-        <input type="text" id="movToLocation" placeholder="VD: Phòng họp A, Ban Giám hiệu...">
-        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:1.5rem;">
+        <input type="text" id="movToLocation" placeholder="VD: Phòng Lab 1, Văn phòng Khoa...">
+        <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('movementModal')">Hủy</button>
           <button type="submit" class="primary">Xác nhận</button>
         </div>
@@ -239,9 +252,9 @@
     </div>
   </div>
 
- <script>
-  const API_BASE_URL = "https://kho-ha-tang-api.nthanhphuong.workers.dev";
-</script>
-<script src="app.js"></script>
+  <script>
+    const API_BASE_URL = "https://kho-ha-tang-api.nthanhphuong.workers.dev";
+  </script>
+  <script src="app.js"></script>
 </body>
 </html>
