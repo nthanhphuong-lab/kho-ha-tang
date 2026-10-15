@@ -23,7 +23,7 @@ function setElementValueSafe(id, val, isSelect = false) {
   }
 }
 
-// Bật Modal chắc chắn hiển thị
+// Bật Modal
 function showModalById(id) {
   const m = document.getElementById(id);
   if (!m) return;
@@ -41,78 +41,42 @@ function closeModal(id) {
   m.style.setProperty("display", "none", "important");
 }
 
+// BỘ LẮNG NGHE SỰ KIỆN CLICK TOÀN CỤC
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  e.preventDefault();
+
+  const act = btn.getAttribute("data-act");
+  const val = btn.getAttribute("data-val") || "";
+
+  if (act === "edit-dev") {
+    openDeviceModal(val);
+  } else if (act === "quick-mov") {
+    openMovementModal(val);
+  } else if (act === "del-dev") {
+    deleteDeviceByCode(val);
+  } else if (act === "rename-loc") {
+    renameLocation(val);
+  } else if (act === "del-loc") {
+    deleteLocation(val);
+  } else if (act === "rename-cat") {
+    renameCategory(val);
+  } else if (act === "del-cat") {
+    deleteCategory(val);
+  }
+});
+
+document.addEventListener("change", (e) => {
+  const chk = e.target.closest("input.dev-check");
+  if (chk) {
+    toggleSelectDevice(chk.value, chk.checked);
+  }
+});
+
 document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("kho_token");
   const cachedUser = localStorage.getItem("kho_user");
-
-  // GẮN SỰ KIỆN CLICK TRỰC TIẾP LÊN BẢNG THIẾT BỊ
-  const devTbody = document.getElementById("deviceTableBody");
-  if (devTbody) {
-    devTbody.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-act]");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      const act = btn.getAttribute("data-act");
-      const code = btn.getAttribute("data-val") || "";
-
-      if (act === "edit-dev") {
-        openDeviceModal(code);
-      } else if (act === "quick-mov") {
-        openMovementModal(code);
-      } else if (act === "del-dev") {
-        deleteDeviceByCode(code);
-      }
-    });
-
-    devTbody.addEventListener("change", (e) => {
-      const chk = e.target.closest("input.dev-check");
-      if (chk) {
-        toggleSelectDevice(chk.value, chk.checked);
-      }
-    });
-  }
-
-  // GẮN SỰ KIỆN CLICK TRỰC TIẾP LÊN BẢNG VỊ TRÍ
-  const locTbody = document.getElementById("locationTableBody");
-  if (locTbody) {
-    locTbody.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-act]");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      const act = btn.getAttribute("data-act");
-      const val = btn.getAttribute("data-val") || "";
-
-      if (act === "rename-loc") {
-        renameLocation(val);
-      } else if (act === "del-loc") {
-        deleteLocation(val);
-      }
-    });
-  }
-
-  // GẮN SỰ KIỆN CLICK TRỰC TIẾP LÊN BẢNG DANH MỤC
-  const catTbody = document.getElementById("categoryTableBody");
-  if (catTbody) {
-    catTbody.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-act]");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      const act = btn.getAttribute("data-act");
-      const val = btn.getAttribute("data-val") || "";
-
-      if (act === "rename-cat") {
-        renameCategory(val);
-      } else if (act === "del-cat") {
-        deleteCategory(val);
-      }
-    });
-  }
 
   if (token && cachedUser) {
     try {
@@ -285,6 +249,7 @@ function resetFilters() {
   renderDevices();
 }
 
+// RENDER BẢNG: TINH GỌN CỘT VÀ CỤM NÚT THAO TÁC
 function renderDevices() {
   const filtered = getFilteredDevices();
   const tbody = document.getElementById("deviceTableBody");
@@ -299,13 +264,13 @@ function renderDevices() {
     return `
       <tr>
         ${isAdmin ? `
-          <td style="width: 36px;">
+          <td style="width:30px;">
             <input type="checkbox" class="dev-check" value="${d.code}" ${isChecked ? 'checked' : ''}>
           </td>` : `<td></td>`}
         <td><b>${d.code}</b></td>
         <td>
           <div><b>${d.name || d.code}</b></div>
-          ${d.notes ? `<small class="muted" style="display:block; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${d.notes}</small>` : ''}
+          ${d.notes ? `<small class="muted" style="display:block; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${d.notes}</small>` : ''}
         </td>
         <td>${d.model || "-"}</td>
         <td><code>${d.serial || "-"}</code></td>
@@ -320,8 +285,8 @@ function renderDevices() {
         ${isAdmin ? `
           <td style="text-align:right;">
             <div class="action-btn-group">
-              <button type="button" class="primary btn-action-sm" data-act="quick-mov" data-val="\${d.code}" title="Điều chuyển hoặc báo sự cố">Chuyển</button>
-              <button type="button" class="secondary btn-action-sm" data-act="edit-dev" data-val="\${d.code}" title="Chỉnh sửa thông tin thiết bị">Sửa</button>
+              <button type="button" class="primary btn-action-sm" data-act="quick-mov" data-val="\${d.code}" title="Điều chuyển / Báo sự cố">Chuyển</button>
+              <button type="button" class="secondary btn-action-sm" data-act="edit-dev" data-val="\${d.code}" title="Sửa thiết bị">Sửa</button>
               <button type="button" class="secondary btn-action-sm" data-act="del-dev" data-val="\${d.code}" style="color:red;" title="Xóa thiết bị">Xóa</button>
             </div>
           </td>` : `<td></td>`}
@@ -447,7 +412,7 @@ async function handleSaveDevice(e) {
 }
 
 // ----------------------------------------------------
-// ĐIỀU CHUYỂN / BÁO SỰ CỐ
+// ĐIỀU CHUYỂN / BÁO SỰ CỐ (ĐÃ SỬA CHUẨN XÁC CHỌN ĐÚNG MÃ)
 // ----------------------------------------------------
 function openMovementModal(deviceCode = null) {
   populateSelects();
@@ -458,6 +423,7 @@ function openMovementModal(deviceCode = null) {
 
   const devSelect = document.getElementById("movDeviceCode");
   if (dev && devSelect) {
+    // Ép chọn chính xác giá trị máy được click
     devSelect.value = dev.code;
     setElementValueSafe("movToLocation", dev.location || "", true);
   }
@@ -467,7 +433,8 @@ function openMovementModal(deviceCode = null) {
 
 function handleSelectDeviceForMovement() {
   const devCode = document.getElementById("movDeviceCode")?.value;
-  const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(devCode).toLowerCase());
+  const clean = String(devCode || "").trim().toLowerCase();
+  const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
   if (dev && dev.location) {
     setElementValueSafe("movToLocation", dev.location, true);
   }
@@ -478,7 +445,8 @@ function handleMovementTypeChange() {
   if (!typeEl) return;
   const type = typeEl.value;
   const devCode = document.getElementById("movDeviceCode")?.value;
-  const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(devCode).toLowerCase());
+  const clean = String(devCode || "").trim().toLowerCase();
+  const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
   const noteInput = document.getElementById("movNote");
 
   if (type === "Báo hỏng / Đi bảo hành") {
@@ -505,7 +473,8 @@ async function handleSaveMovement(e) {
   const type = document.getElementById("movType")?.value;
   const toLocation = document.getElementById("movToLocation")?.value;
   const note = (document.getElementById("movNote")?.value || "").trim();
-  const dev = STATE.devices.find(d => d.code === deviceCode);
+  const clean = String(deviceCode || "").trim().toLowerCase();
+  const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
 
   let newStatus = dev ? (dev.status || "Đang sử dụng") : "Đang sử dụng";
   if (type === "Báo hỏng / Đi bảo hành") newStatus = "Hỏng / Bảo hành";
@@ -515,7 +484,7 @@ async function handleSaveMovement(e) {
 
   try {
     await callMutate("movement.create", {
-      deviceCode,
+      deviceCode: dev ? dev.code : deviceCode,
       type,
       fromLocation: dev ? dev.location : "",
       toLocation,
@@ -557,7 +526,7 @@ function renderLocations() {
     const count = STATE.devices.filter(d => String(d.location).trim().toLowerCase() === String(loc).trim().toLowerCase()).length;
     return `
       <tr>
-        <td style="width: 60px;">${idx + 1}</td>
+        <td style="width: 50px;">${idx + 1}</td>
         <td><b>${loc}</b></td>
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
@@ -616,7 +585,7 @@ function renderCategories() {
     const count = STATE.devices.filter(d => String(d.category).trim().toLowerCase() === String(cat).trim().toLowerCase()).length;
     return `
       <tr>
-        <td style="width: 60px;">${idx + 1}</td>
+        <td style="width: 50px;">${idx + 1}</td>
         <td><b>${cat}</b></td>
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
@@ -656,14 +625,14 @@ async function renameCategory(oldName) {
 async function deleteCategory(name) {
   if (!confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) return;
   try {
-    await callMutate("category.delete", { name: name.trim() });
+    await callMutate("category.delete", { name });
     await loadState();
   } catch (err) {
     console.error(err);
   }
 }
 
-// NẠP DỮ LIỆU SELECT DROPDOWN
+// NẠP DỮ LIỆU SELECT DROPDOWN (ĐẢM BẢO VALUE TRÙNG KHỚP VỚI MÃ THIẾT BỊ)
 function populateSelects() {
   const catOptions = STATE.categories.map(c => `<option value="${c}">${c}</option>`).join("");
   const devCat = document.getElementById("devCategory");
