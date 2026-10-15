@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kho Hạ Tầng CNTT</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Thư viện quét mã vạch / QR qua Camera (siêu nhẹ, không tải nặng) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
@@ -28,7 +30,6 @@
 
   <!-- GIAO DIỆN CHÍNH -->
   <div id="app" class="hidden">
-    <!-- Cột bên trái -->
     <aside class="sidebar">
       <div class="brand">
         <div class="logo">K</div>
@@ -45,13 +46,13 @@
           <span class="icon">💻</span> <span>Thiết bị</span>
         </button>
         <button class="nav-btn" onclick="showView('movements')">
-          <span class="icon">🔄</span> <span>Xuất / Nhập</span>
+          <span class="icon">🔄</span> <span>Xuất / Nhập / Sự cố</span>
         </button>
         <button class="nav-btn" onclick="showView('categories')">
           <span class="icon">📁</span> <span>Danh mục</span>
         </button>
         <button class="nav-btn" onclick="showView('reports')">
-          <span class="icon">📑</span> <span>Báo cáo</span>
+          <span class="icon">📑</span> <span>Báo cáo & Nhập Excel</span>
         </button>
         <button class="nav-btn admin-only" onclick="showView('users')">
           <span class="icon">👥</span> <span>Người dùng</span>
@@ -63,14 +64,16 @@
       </div>
     </aside>
 
-    <!-- Nội dung chính bên phải -->
     <main>
       <header>
         <div>
           <p class="eyebrow">HỆ THỐNG QUẢN LÝ KHO</p>
           <h1 id="pageTitle">Tổng quan</h1>
         </div>
-        <div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="secondary" onclick="openScannerModal()" style="display:flex; align-items:center; gap:6px;">
+            📷 <span>Quét QR / Barcode</span>
+          </button>
           <span id="syncStatus" class="badge">Đã đồng bộ</span>
         </div>
       </header>
@@ -97,16 +100,23 @@
         </div>
       </section>
 
-      <!-- TAB 2: THIẾT BỊ -->
+      <!-- TAB 2: DANH SÁCH THIẾT BỊ -->
       <section id="devices" class="view hidden">
         <div class="toolbar">
-          <input type="text" id="deviceSearch" placeholder="Tìm theo mã, tên, serial, vị trí..." oninput="renderDevices()">
-          <button class="primary admin-only" onclick="openDeviceModal()">+ Thêm thiết bị</button>
+          <input type="text" id="deviceSearch" placeholder="Tìm kiếm nhanh mã, tên, serial, vị trí..." oninput="renderDevices()">
+          <div style="display:flex; gap:8px;">
+            <button class="secondary admin-only" onclick="triggerImportCSV()">📥 Nhập từ Excel/CSV</button>
+            <input type="file" id="csvFileInput" accept=".csv" style="display:none;" onchange="handleFileSelect(event)">
+            <button class="primary admin-only" onclick="openDeviceModal()">+ Thêm thiết bị</button>
+          </div>
         </div>
         <div class="card table-card">
           <table class="table">
             <thead>
               <tr>
+                <th style="width:40px;" class="admin-only">
+                  <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                </th>
                 <th>Mã</th>
                 <th>Tên thiết bị</th>
                 <th>Model / Hãng</th>
@@ -114,7 +124,7 @@
                 <th>Danh mục</th>
                 <th>Vị trí</th>
                 <th>Tình trạng</th>
-                <th class="admin-only" style="text-align:right;">Thao tác</th>
+                <th class="admin-only" style="text-align:right;">Thao tác nhanh</th>
               </tr>
             </thead>
             <tbody id="deviceTableBody"></tbody>
@@ -122,12 +132,12 @@
         </div>
       </section>
 
-      <!-- TAB 3: XUẤT NHẬP -->
+      <!-- TAB 3: XUẤT NHẬP & SỰ CỐ -->
       <section id="movements" class="view hidden">
         <div class="toolbar">
           <div>
-            <h2>Lịch sử xuất / nhập kho</h2>
-            <p class="muted">Theo dõi nhật ký điều chuyển tài sản</p>
+            <h2>Lịch sử điều chuyển & sự cố</h2>
+            <p class="muted">Toàn bộ nhật ký xuất/nhập/bảo hành được ghi nhận</p>
           </div>
           <button class="primary admin-only" onclick="openMovementModal()">+ Tạo phiếu xuất/nhập</button>
         </div>
@@ -140,6 +150,7 @@
                 <th>Loại giao dịch</th>
                 <th>Từ vị trí</th>
                 <th>Đến vị trí</th>
+                <th>Ghi chú / Lý do</th>
                 <th>Người thực hiện</th>
               </tr>
             </thead>
@@ -148,12 +159,12 @@
         </div>
       </section>
 
-      <!-- TAB 4: DANH MỤC (CÓ THÊM, SỬA, XÓA) -->
+      <!-- TAB 4: DANH MỤC -->
       <section id="categories" class="view hidden">
         <div class="toolbar">
           <div>
-            <h2>Danh mục phân loại thiết bị</h2>
-            <p class="muted">Quản lý các nhóm thiết bị hạ tầng</p>
+            <h2>Danh mục thiết bị</h2>
+            <p class="muted">Phân loại các nhóm tài sản</p>
           </div>
           <button class="primary admin-only" onclick="openAddCategoryModal()">+ Thêm danh mục</button>
         </div>
@@ -163,7 +174,7 @@
               <tr>
                 <th style="width:60px;">STT</th>
                 <th>Tên danh mục</th>
-                <th>Số lượng thiết bị</th>
+                <th>Số lượng</th>
                 <th class="admin-only" style="text-align:right;">Thao tác</th>
               </tr>
             </thead>
@@ -172,14 +183,16 @@
         </div>
       </section>
 
-      <!-- TAB 5: BÁO CÁO (XUẤT EXCEL/CSV) -->
+      <!-- TAB 5: BÁO CÁO & XUẤT NHẬP EXCEL -->
       <section id="reports" class="view hidden">
         <div class="card" style="padding: 2rem;">
-          <h2>Báo cáo & Xuất dữ liệu kho</h2>
-          <p class="muted" style="margin-top: 5px;">Tải dữ liệu danh sách thiết bị và lịch sử xuất nhập kho về máy tính</p>
-          <div style="display:flex; gap:15px; margin-top:1.5rem;">
-            <button class="primary" onclick="exportDevicesCSV()">📥 Tải danh sách thiết bị (.CSV)</button>
-            <button class="secondary" onclick="exportMovementsCSV()">📥 Tải lịch sử xuất nhập (.CSV)</button>
+          <h2>Xuất & Nhập dữ liệu hàng loạt</h2>
+          <p class="muted" style="margin-top: 5px;">Tải dữ liệu ra file Excel hoặc nạp hàng loạt hàng trăm thiết bị cùng lúc</p>
+          <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:1.5rem;">
+            <button class="primary" onclick="exportDevicesCSV()">📤 Xuất danh sách thiết bị (.CSV)</button>
+            <button class="secondary" onclick="exportMovementsCSV()">📤 Xuất lịch sử điều chuyển (.CSV)</button>
+            <button class="secondary" onclick="downloadSampleCSV()">📄 Tải file CSV mẫu nhập liệu</button>
+            <button class="secondary admin-only" onclick="triggerImportCSV()">📥 Nạp dữ liệu từ file CSV</button>
           </div>
         </div>
       </section>
@@ -189,7 +202,7 @@
         <div class="toolbar">
           <div>
             <h2>Quản trị người dùng</h2>
-            <p class="muted">Thêm tài khoản và phân quyền cán bộ xem hoặc quản trị kho</p>
+            <p class="muted">Phân quyền tài khoản Quản trị (Admin) hoặc Chỉ xem (Viewer)</p>
           </div>
           <button class="primary admin-only" onclick="openUserModal()">+ Thêm người dùng</button>
         </div>
@@ -210,7 +223,54 @@
     </main>
   </div>
 
-  <!-- MODAL THÊM / SỬA THIẾT BỊ (ĐẦY ĐỦ TRƯỜNG DỮ LIỆU) -->
+  <!-- THANH CÔNG CỤ NỔI KHI CHỌN HÀNG LOẠT (FLOATING BULK BAR) -->
+  <div id="floatingBar" class="floating-bar hidden">
+    <span>Đã chọn <b id="selectedCount">0</b> thiết bị</span>
+    <div style="display:flex; gap:8px;">
+      <button class="primary" onclick="openBulkMovementModal()">🔄 Điều chuyển hàng loạt</button>
+      <button class="secondary" onclick="bulkDeleteDevices()" style="color:red;">🗑️ Xóa đã chọn</button>
+      <button class="secondary" onclick="clearSelected()">Hủy chọn</button>
+    </div>
+  </div>
+
+  <!-- MODAL ĐIỀU CHUYỂN HÀNG LOẠT -->
+  <div id="bulkMovementModal" class="modal hidden">
+    <div class="modal-card card">
+      <h3>Điều chuyển hàng loạt thiết bị</h3>
+      <p class="muted" id="bulkModalDesc">Áp dụng cho các thiết bị đã chọn</p>
+      <form onsubmit="handleSaveBulkMovement(event)" style="margin-top:1rem;">
+        <label>Loại giao dịch (*)</label>
+        <select id="bulkType" onchange="handleBulkTypeChange()">
+          <option value="Xuất kho">Xuất kho sử dụng (Bàn giao vị trí mới)</option>
+          <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Tháo dỡ đem đi sửa chữa</option>
+          <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
+          <option value="Báo thanh lý">Đề xuất thanh lý</option>
+        </select>
+        <label>Vị trí chuyển đến (*)</label>
+        <input type="text" id="bulkToLocation" required placeholder="VD: Phòng Lab 2, Kho kỹ thuật...">
+        <label>Ghi chú / Lý do</label>
+        <input type="text" id="bulkNote" placeholder="VD: Bàn giao đợt 1...">
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="closeModal('bulkMovementModal')">Hủy</button>
+          <button type="submit" class="primary">Xác nhận điều chuyển</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL QUÉT MÃ QR BẰNG CAMERA -->
+  <div id="scannerModal" class="modal hidden">
+    <div class="modal-card card" style="max-width:440px;">
+      <h3>Quét mã Barcode / QR Code</h3>
+      <p class="muted">Đưa tem mã vạch hoặc mã QR vào khung camera</p>
+      <div id="qr-reader" style="width:100%; margin:1rem 0; border-radius:8px; overflow:hidden;"></div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" onclick="closeScannerModal()">Đóng Camera</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL THÊM / SỬA THIẾT BỊ -->
   <div id="deviceModal" class="modal hidden">
     <div class="modal-card card">
       <h3 id="deviceModalTitle">Thêm thiết bị mới</h3>
@@ -226,7 +286,7 @@
         <label>Danh mục</label>
         <select id="devCategory"></select>
         <label>Vị trí</label>
-        <input type="text" id="devLocation" placeholder="VD: Tủ Rack Tầng 2, Phòng Server">
+        <input type="text" id="devLocation" placeholder="VD: Kho kỹ thuật Tầng 1">
         <label>Tình trạng</label>
         <select id="devStatus">
           <option value="Trong kho">Trong kho</option>
@@ -235,7 +295,7 @@
           <option value="Thanh lý">Thanh lý</option>
         </select>
         <label>Ghi chú</label>
-        <input type="text" id="devNotes" placeholder="Ghi chú thêm về thông số, tình trạng...">
+        <input type="text" id="devNotes" placeholder="Ghi chú thêm...">
         <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('deviceModal')">Hủy</button>
           <button type="submit" class="primary">Lưu thiết bị</button>
@@ -244,48 +304,52 @@
     </div>
   </div>
 
-  <!-- MODAL THÊM NGƯỜI DÙNG -->
-  <div id="userModal" class="modal hidden">
+  <!-- MODAL ĐIỀU CHUYỂN ĐƠN LẺ -->
+  <div id="movementModal" class="modal hidden">
     <div class="modal-card card">
-      <h3 id="userModalTitle">Thêm người dùng mới</h3>
-      <form onsubmit="handleSaveUser(event)">
-        <label>Tên đăng nhập (*)</label>
-        <input type="text" id="usrUsername" required placeholder="VD: user01, canbo01">
-        <label>Mật khẩu (*)</label>
-        <input type="password" id="usrPassword" placeholder="Nhập mật khẩu">
-        <label>Tên hiển thị</label>
-        <input type="text" id="usrDisplayName" placeholder="VD: Cán bộ quản lý">
-        <label>Quyền hạn</label>
-        <select id="usrRole">
-          <option value="viewer">Người xem (Chỉ xem, không được thêm/sửa/xóa)</option>
-          <option value="admin">Quản trị viên (Toàn quyền)</option>
+      <h3 id="movementModalTitle">Tạo phiếu điều chuyển / Báo sự cố</h3>
+      <form onsubmit="handleSaveMovement(event)">
+        <label>Chọn thiết bị (*)</label>
+        <select id="movDeviceCode" required onchange="handleSelectDeviceForMovement()"></select>
+        <label>Loại giao dịch (*)</label>
+        <select id="movType" onchange="handleMovementTypeChange()">
+          <option value="Xuất kho">Xuất kho sử dụng</option>
+          <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Đi bảo hành</option>
+          <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
+          <option value="Báo thanh lý">Báo thanh lý</option>
+          <option value="Điều chuyển">Điều chuyển</option>
         </select>
+        <label>Vị trí chuyển đến (*)</label>
+        <input type="text" id="movToLocation" required placeholder="VD: Phòng Lab 1, Kho kỹ thuật...">
+        <label>Ghi chú / Lý do</label>
+        <input type="text" id="movNote" placeholder="VD: Sét đánh nguồn, hỏng quạt...">
         <div class="modal-actions">
-          <button type="button" class="secondary" onclick="closeModal('userModal')">Hủy</button>
-          <button type="submit" class="primary">Lưu người dùng</button>
+          <button type="button" class="secondary" onclick="closeModal('movementModal')">Hủy</button>
+          <button type="submit" class="primary">Xác nhận</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- MODAL XUẤT NHẬP KHO -->
-  <div id="movementModal" class="modal hidden">
+  <!-- MODAL THÊM USER -->
+  <div id="userModal" class="modal hidden">
     <div class="modal-card card">
-      <h3>Tạo phiếu xuất / nhập kho</h3>
-      <form onsubmit="handleSaveMovement(event)">
-        <label>Chọn thiết bị (*)</label>
-        <select id="movDeviceCode" required></select>
-        <label>Loại giao dịch</label>
-        <select id="movType">
-          <option value="Xuất kho">Xuất kho sử dụng</option>
-          <option value="Nhập kho">Nhập lại kho</option>
-          <option value="Bảo hành">Đem đi sửa chữa / bảo hành</option>
+      <h3>Thêm người dùng</h3>
+      <form onsubmit="handleSaveUser(event)">
+        <label>Tên đăng nhập (*)</label>
+        <input type="text" id="usrUsername" required placeholder="VD: user02">
+        <label>Mật khẩu (*)</label>
+        <input type="password" id="usrPassword" placeholder="Nhập mật khẩu">
+        <label>Tên hiển thị</label>
+        <input type="text" id="usrDisplayName" placeholder="VD: Cán bộ kho">
+        <label>Quyền hạn</label>
+        <select id="usrRole">
+          <option value="viewer">Người xem (Chỉ xem)</option>
+          <option value="admin">Quản trị viên (Toàn quyền)</option>
         </select>
-        <label>Đến vị trí mới</label>
-        <input type="text" id="movToLocation" placeholder="VD: Phòng Lab 1, Văn phòng Khoa...">
         <div class="modal-actions">
-          <button type="button" class="secondary" onclick="closeModal('movementModal')">Hủy</button>
-          <button type="submit" class="primary">Xác nhận</button>
+          <button type="button" class="secondary" onclick="closeModal('userModal')">Hủy</button>
+          <button type="submit" class="primary">Lưu</button>
         </div>
       </form>
     </div>
