@@ -23,7 +23,7 @@ function setElementValueSafe(id, val, isSelect = false) {
   }
 }
 
-// Bật Modal chắc chắn hiển thị
+// Bật Modal
 function showModalById(id) {
   const m = document.getElementById(id);
   if (!m) return;
@@ -31,7 +31,7 @@ function showModalById(id) {
   m.style.display = "flex";
 }
 
-// Đóng Modal chắc chắn ẩn
+// Đóng Modal
 function closeModal(id) {
   const m = document.getElementById(id);
   if (!m) return;
@@ -42,6 +42,26 @@ function closeModal(id) {
 document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("kho_token");
   const cachedUser = localStorage.getItem("kho_user");
+
+  // Gán sự kiện click an toàn cho bảng thiết bị (loại bỏ hoàn toàn lỗi inline onclick)
+  const tbody = document.getElementById("deviceTableBody");
+  if (tbody) {
+    tbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const idx = parseInt(btn.dataset.index, 10);
+      if (isNaN(idx)) return;
+
+      if (action === "quickAction") {
+        openMovementModal(idx);
+      } else if (action === "edit") {
+        openDeviceModal(idx);
+      } else if (action === "delete") {
+        deleteDeviceByIndex(idx);
+      }
+    });
+  }
 
   if (token && cachedUser) {
     try {
@@ -226,12 +246,11 @@ function renderDevices() {
   tbody.innerHTML = filtered.map(d => {
     const isChecked = selectedCodes.has(d.code);
     const idx = d._idx;
-    const cleanCode = (d.code || "").replace(/'/g, "\\'");
     return `
       <tr>
         ${isAdmin ? `
           <td>
-            <input type="checkbox" class="dev-check" value="\${d.code}" ${isChecked ? 'checked' : ''} onchange="toggleSelectDevice('${cleanCode}', this.checked)">
+            <input type="checkbox" class="dev-check" value="\${d.code}" ${isChecked ? 'checked' : ''} onchange="toggleSelectDevice('${d.code}', this.checked)">
           </td>` : `<td></td>`}
         <td><b>${d.code}</b></td>
         <td>
@@ -250,9 +269,9 @@ function renderDevices() {
         </td>
         ${isAdmin ? `
           <td style="text-align:right; white-space:nowrap;">
-            <button type="button" onclick="quickAction(\${idx})" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
-            <button type="button" onclick="editDevice(\${idx})" style="cursor:pointer; margin-right:4px;">Sửa</button>
-            <button type="button" onclick="deleteDevice(\${idx})" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" data-action="quickAction" data-index="\${idx}" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
+            <button type="button" data-action="edit" data-index="\${idx}" style="cursor:pointer; margin-right:4px;">Sửa</button>
+            <button type="button" data-action="delete" data-index="\${idx}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -299,29 +318,17 @@ function updateFloatingBar() {
 }
 
 // ----------------------------------------------------
-// HÀM TÌM THIẾT BỊ ĐA NĂNG (THEO INDEX HOẶC CODE)
-// ----------------------------------------------------
-function findDeviceTarget(target) {
-  if (target === null || target === undefined) return null;
-  if (typeof target === "number") {
-    return STATE.devices[target] || null;
-  }
-  const clean = String(target).trim().toLowerCase();
-  return STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean) || null;
-}
-
-// ----------------------------------------------------
 // SỬA / THÊM THIẾT BỊ
 // ----------------------------------------------------
-function openDeviceModal(target = null) {
+function openDeviceModal(deviceIndex = null) {
   populateSelects();
   showModalById("deviceModal");
 
   const titleEl = document.getElementById("deviceModalTitle");
   const codeEl = document.getElementById("devCode");
-  const dev = findDeviceTarget(target);
 
-  if (dev) {
+  if (deviceIndex !== null && typeof deviceIndex === "number" && STATE.devices[deviceIndex]) {
+    const dev = STATE.devices[deviceIndex];
     if (titleEl) titleEl.innerText = "Chỉnh sửa hồ sơ thiết bị";
     if (codeEl) {
       codeEl.value = dev.code || "";
@@ -337,7 +344,7 @@ function openDeviceModal(target = null) {
   } else {
     if (titleEl) titleEl.innerText = "Thêm thiết bị mới";
     if (codeEl) {
-      codeEl.value = typeof target === "string" ? target : "";
+      codeEl.value = typeof deviceIndex === "string" ? deviceIndex : "";
       codeEl.readOnly = false;
     }
     setElementValueSafe("devName", "");
@@ -350,17 +357,12 @@ function openDeviceModal(target = null) {
   }
 }
 
-// Đăng ký cả 2 tên hàm lên window để không bị lỗi cache
-window.editDevice = function(target) { openDeviceModal(target); };
-window.editDeviceByIndex = function(idx) { openDeviceModal(idx); };
-
-window.deleteDevice = function(target) {
-  const dev = findDeviceTarget(target);
+function deleteDeviceByIndex(idx) {
+  const dev = STATE.devices[idx];
   if (!dev) return;
   if (!confirm(`Bạn có chắc chắn muốn xóa thiết bị [${dev.code}]?`)) return;
   callMutate("device.delete", { code: dev.code }).then(() => loadState());
-};
-window.deleteDeviceByIndex = window.deleteDevice;
+}
 
 async function handleSaveDevice(e) {
   e.preventDefault();
@@ -383,21 +385,18 @@ async function handleSaveDevice(e) {
 // ----------------------------------------------------
 // ĐIỀU CHUYỂN / BÁO SỰ CỐ
 // ----------------------------------------------------
-function openMovementModal(target = null) {
+function openMovementModal(deviceIndex = null) {
   populateSelects();
   showModalById("movementModal");
 
-  const dev = findDeviceTarget(target);
-  if (dev) {
+  if (deviceIndex !== null && typeof deviceIndex === "number" && STATE.devices[deviceIndex]) {
+    const dev = STATE.devices[deviceIndex];
     setElementValueSafe("movDeviceCode", dev.code, true);
     setElementValueSafe("movToLocation", dev.location || "", true);
   }
 
   handleMovementTypeChange();
 }
-
-window.quickAction = function(target) { openMovementModal(target); };
-window.quickActionByIndex = function(idx) { openMovementModal(idx); };
 
 function handleSelectDeviceForMovement() {
   handleMovementTypeChange();
@@ -689,7 +688,7 @@ function handleScannedResult(code) {
   );
 
   if (devIdx !== -1) {
-    quickAction(devIdx);
+    openMovementModal(devIdx);
   } else {
     if (confirm(`Mã [${code}] chưa có trong hệ thống. Bạn có muốn thêm mới thiết bị với mã này không?`)) {
       openDeviceModal(code);
@@ -800,7 +799,7 @@ function exportMovementsCSV() {
   downloadCSV(`lich_su_dieu_chuyen_${new Date().toISOString().slice(0,10)}.csv`, rows);
 }
 
-// QUẢN TRỊ USER
+// USER
 async function loadUsers() {
   const token = localStorage.getItem("kho_token");
   try {
