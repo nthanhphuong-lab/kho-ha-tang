@@ -41,6 +41,70 @@ document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem("kho_token");
   const cachedUser = localStorage.getItem("kho_user");
 
+  // LẮNG NGHE SỰ KIỆN CLICK BẢNG THIẾT BỊ (Tránh 100% lỗi inline onclick)
+  const devTbody = document.getElementById("deviceTableBody");
+  if (devTbody) {
+    devTbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const idx = parseInt(btn.dataset.index, 10);
+      if (isNaN(idx)) return;
+
+      if (action === "quickAction") {
+        openMovementModal(idx);
+      } else if (action === "edit") {
+        openDeviceModal(idx);
+      } else if (action === "delete") {
+        deleteDeviceByIndex(idx);
+      }
+    });
+
+    devTbody.addEventListener("change", (e) => {
+      const chk = e.target.closest("input.dev-check");
+      if (!chk) return;
+      toggleSelectDevice(chk.value, chk.checked);
+    });
+  }
+
+  // LẮNG NGHE SỰ KIỆN CLICK BẢNG VỊ TRÍ
+  const locTbody = document.getElementById("locationTableBody");
+  if (locTbody) {
+    locTbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const idx = parseInt(btn.dataset.index, 10);
+      if (isNaN(idx) || !STATE.locations[idx]) return;
+      const locName = STATE.locations[idx];
+
+      if (action === "renameLocation") {
+        renameLocation(locName);
+      } else if (action === "deleteLocation") {
+        deleteLocation(locName);
+      }
+    });
+  }
+
+  // LẮNG NGHE SỰ KIỆN CLICK BẢNG DANH MỤC
+  const catTbody = document.getElementById("categoryTableBody");
+  if (catTbody) {
+    catTbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const idx = parseInt(btn.dataset.index, 10);
+      if (isNaN(idx) || !STATE.categories[idx]) return;
+      const catName = STATE.categories[idx];
+
+      if (action === "renameCategory") {
+        renameCategory(catName);
+      } else if (action === "deleteCategory") {
+        deleteCategory(catName);
+      }
+    });
+  }
+
   if (token && cachedUser) {
     try {
       STATE.currentUser = JSON.parse(cachedUser);
@@ -226,7 +290,7 @@ function renderDevices() {
       <tr>
         ${isAdmin ? `
           <td>
-            <input type="checkbox" class="dev-check" value="\${d.code}" ${isChecked ? 'checked' : ''} onchange="toggleSelectDevice('${d.code}', this.checked)">
+            <input type="checkbox" class="dev-check" value="${d.code}" ${isChecked ? 'checked' : ''}>
           </td>` : `<td></td>`}
         <td><b>${d.code}</b></td>
         <td>
@@ -245,9 +309,9 @@ function renderDevices() {
         </td>
         ${isAdmin ? `
           <td style="text-align:right; white-space:nowrap;">
-            <button type="button" onclick="handleDeviceAction('quickAction', \${idx})" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
-            <button type="button" onclick="handleDeviceAction('edit', \${idx})" style="cursor:pointer; margin-right:4px;">Sửa</button>
-            <button type="button" onclick="handleDeviceAction('delete', \${idx})" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" data-action="quickAction" data-index="\${idx}" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
+            <button type="button" data-action="edit" data-index="\${idx}" style="cursor:pointer; margin-right:4px;">Sửa</button>
+            <button type="button" data-action="delete" data-index="\${idx}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -255,16 +319,6 @@ function renderDevices() {
 
   updateFloatingBar();
 }
-
-window.handleDeviceAction = function(action, idx) {
-  if (action === "edit") {
-    openDeviceModal(idx);
-  } else if (action === "quickAction") {
-    openMovementModal(idx);
-  } else if (action === "delete") {
-    deleteDeviceByIndex(idx);
-  }
-};
 
 function toggleSelectDevice(code, isChecked) {
   if (isChecked) selectedCodes.add(code);
@@ -471,8 +525,8 @@ function renderLocations() {
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
-            <button type="button" onclick="renameLocation('\${loc.replace(/'/g, "\\'")}')" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
-            <button type="button" onclick="deleteLocation('\${loc.replace(/'/g, "\\'")}')" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" data-action="renameLocation" data-index="\${idx}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button type="button" data-action="deleteLocation" data-index="\${idx}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -695,8 +749,8 @@ function renderCategories() {
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
-            <button type="button" onclick="renameCategory('\${cat.replace(/'/g, "\\'")}')" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
-            <button type="button" onclick="deleteCategory('\${cat.replace(/'/g, "\\'")}')" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" data-action="renameCategory" data-index="\${idx}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button type="button" data-action="deleteCategory" data-index="\${idx}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
