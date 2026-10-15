@@ -9,7 +9,7 @@
 </head>
 <body>
 
-  <!-- ĐĂNG NHẬP -->
+  <!-- MÀN HÌNH ĐĂNG NHẬP -->
   <div id="login" class="login">
     <div class="card login-card">
       <div class="logo">K</div>
@@ -102,7 +102,7 @@
         </div>
       </section>
 
-      <!-- TAB 2: DANH SÁCH THIẾT BỊ VỚI BỘ LỌC 3 LỚP -->
+      <!-- TAB 2: DANH SÁCH THIẾT BỊ -->
       <section id="devices" class="view hidden">
         <div class="toolbar-stacked">
           <div class="filter-bar">
@@ -147,12 +147,12 @@
         </div>
       </section>
 
-      <!-- TAB 3: QUẢN LÝ VỊ TRÍ & KHO (LOCATIONS) -->
+      <!-- TAB 3: VỊ TRÍ & KHO -->
       <section id="locations" class="view hidden">
         <div class="toolbar">
           <div>
             <h2>Danh bạ Vị trí & Kho lưu trữ</h2>
-            <p class="muted">Chuẩn hóa tên các kho và vị trí lắp đặt (Tòa nhà, Tủ rack, Phòng Lab)</p>
+            <p class="muted">Chuẩn hóa tên các kho và vị trí lắp đặt</p>
           </div>
           <button class="primary admin-only" onclick="openAddLocationModal()">+ Thêm Vị trí / Kho</button>
         </div>
@@ -162,7 +162,7 @@
               <tr>
                 <th style="width:60px;">STT</th>
                 <th>Tên Vị trí / Kho lưu trữ</th>
-                <th>Số lượng thiết bị đang đặt</th>
+                <th>Số lượng thiết bị</th>
                 <th class="admin-only" style="text-align:right;">Thao tác</th>
               </tr>
             </thead>
@@ -262,50 +262,13 @@
     </main>
   </div>
 
-  <!-- THANH CÔNG CỤ NỔI KHI CHỌN HÀNG LOẠT -->
+  <!-- THANH NỔI KHI CHỌN HÀNG LOẠT -->
   <div id="floatingBar" class="floating-bar hidden">
-    <span>Đã chọn <b id="selectedCount">0</b> thiết bị (theo kết quả lọc)</span>
+    <span>Đã chọn <b id="selectedCount">0</b> thiết bị</span>
     <div style="display:flex; gap:8px;">
       <button class="primary" onclick="openBulkMovementModal()">🔄 Điều chuyển hàng loạt</button>
       <button class="secondary" onclick="bulkDeleteDevices()" style="color:red;">🗑️ Xóa đã chọn</button>
       <button class="secondary" onclick="clearSelected()">Hủy chọn</button>
-    </div>
-  </div>
-
-  <!-- MODAL ĐIỀU CHUYỂN HÀNG LOẠT (CHỌN VỊ TRÍ CHUẨN HÓA) -->
-  <div id="bulkMovementModal" class="modal hidden">
-    <div class="modal-card card">
-      <h3>Điều chuyển hàng loạt thiết bị</h3>
-      <p class="muted" id="bulkModalDesc">Áp dụng cho các thiết bị đã chọn</p>
-      <form onsubmit="handleSaveBulkMovement(event)" style="margin-top:1rem;">
-        <label>Loại giao dịch (*)</label>
-        <select id="bulkType" onchange="handleBulkTypeChange()">
-          <option value="Xuất kho">Xuất kho sử dụng (Bàn giao vị trí mới)</option>
-          <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Tháo dỡ đem đi sửa chữa</option>
-          <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
-          <option value="Báo thanh lý">Đề xuất thanh lý</option>
-        </select>
-        <label>Vị trí chuyển đến (*)</label>
-        <select id="bulkToLocation" required></select>
-        <label>Ghi chú / Lý do</label>
-        <input type="text" id="bulkNote" placeholder="VD: Di dời toàn bộ phòng máy sang khu mới...">
-        <div class="modal-actions">
-          <button type="button" class="secondary" onclick="closeModal('bulkMovementModal')">Hủy</button>
-          <button type="submit" class="primary">Xác nhận điều chuyển</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL QUÉT MÃ QR BẰNG CAMERA -->
-  <div id="scannerModal" class="modal hidden">
-    <div class="modal-card card" style="max-width:440px;">
-      <h3>Quét mã Barcode / QR Code</h3>
-      <p class="muted">Đưa tem mã vạch hoặc mã QR vào khung camera</p>
-      <div id="qr-reader" style="width:100%; margin:1rem 0; border-radius:8px; overflow:hidden;"></div>
-      <div class="modal-actions">
-        <button type="button" class="secondary" onclick="closeScannerModal()">Đóng Camera</button>
-      </div>
     </div>
   </div>
 
@@ -352,16 +315,16 @@
         <select id="movDeviceCode" required onchange="handleSelectDeviceForMovement()"></select>
         <label>Loại giao dịch (*)</label>
         <select id="movType" onchange="handleMovementTypeChange()">
-          <option value="Xuất kho">Xuất kho sử dụng (Bàn giao vị trí mới)</option>
+          <option value="Xuất kho">Xuất kho sử dụng</option>
           <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Đi bảo hành</option>
           <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
           <option value="Báo thanh lý">Báo thanh lý</option>
-          <option value="Điều chuyển">Điều chuyển</option>
+          <option value="Điều chuyển">Điều chuyển vị trí</option>
         </select>
         <label>Vị trí chuyển đến (*)</label>
         <select id="movToLocation" required></select>
         <label>Ghi chú / Lý do</label>
-        <input type="text" id="movNote" placeholder="VD: Sét đánh nguồn, hỏng quạt...">
+        <input type="text" id="movNote" placeholder="VD: Cháy nguồn, sửa chữa...">
         <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('movementModal')">Hủy</button>
           <button type="submit" class="primary">Xác nhận</button>
@@ -370,7 +333,44 @@
     </div>
   </div>
 
-  <!-- MODAL THÊM USER -->
+  <!-- MODAL ĐIỀU CHUYỂN HÀNG LOẠT -->
+  <div id="bulkMovementModal" class="modal hidden">
+    <div class="modal-card card">
+      <h3>Điều chuyển hàng loạt thiết bị</h3>
+      <p class="muted" id="bulkModalDesc">Áp dụng cho các thiết bị đã chọn</p>
+      <form onsubmit="handleSaveBulkMovement(event)" style="margin-top:1rem;">
+        <label>Loại giao dịch (*)</label>
+        <select id="bulkType" onchange="handleBulkTypeChange()">
+          <option value="Xuất kho">Xuất kho sử dụng</option>
+          <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Đi bảo hành</option>
+          <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
+          <option value="Báo thanh lý">Báo thanh lý</option>
+        </select>
+        <label>Vị trí chuyển đến (*)</label>
+        <select id="bulkToLocation" required></select>
+        <label>Ghi chú / Lý do</label>
+        <input type="text" id="bulkNote" placeholder="VD: Chuyển phòng máy...">
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="closeModal('bulkMovementModal')">Hủy</button>
+          <button type="submit" class="primary">Xác nhận</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL QUÉT QR BẰNG CAMERA -->
+  <div id="scannerModal" class="modal hidden">
+    <div class="modal-card card" style="max-width:440px;">
+      <h3>Quét mã Barcode / QR Code</h3>
+      <p class="muted">Đưa mã vạch hoặc mã QR vào khung camera</p>
+      <div id="qr-reader" style="width:100%; margin:1rem 0; border-radius:8px; overflow:hidden;"></div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" onclick="closeScannerModal()">Đóng Camera</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL USER -->
   <div id="userModal" class="modal hidden">
     <div class="modal-card card">
       <h3>Thêm người dùng</h3>
