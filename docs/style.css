@@ -281,19 +281,19 @@ input:focus, select:focus {
 .muted { color: var(--text-muted); font-size: 0.88rem; }
 .hidden { display: none !important; }
 
-/* MODAL HIỂN THỊ CHUẨN XÁC */
+/* MODAL CHUẨN XÁC */
 .modal {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.5);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   z-index: 1000;
 }
 
-.modal.hidden {
-  display: none !important;
+.modal.active {
+  display: flex !important;
 }
 
 .modal-card {
@@ -320,15 +320,15 @@ input:focus, select:focus {
   color: #fff;
   padding: 12px 24px;
   border-radius: 50px;
-  display: flex;
+  display: none;
   align-items: center;
   gap: 20px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
   z-index: 999;
 }
 
-.floating-bar.hidden {
-  display: none !important;
+.floating-bar.active {
+  display: flex !important;
 }
 
 .floating-bar span { font-size: 0.95rem; }
