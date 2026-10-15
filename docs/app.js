@@ -2,6 +2,7 @@ let STATE = {
   devices: [],
   movements: [],
   categories: [],
+  locations: [],
   currentUser: null
 };
 
@@ -39,8 +40,9 @@ function showView(viewId) {
   const titles = {
     dashboard: "Tổng quan",
     devices: "Danh sách thiết bị",
-    movements: "Lịch sử điều chuyển & sự cố",
+    locations: "Danh bạ Vị trí & Kho",
     categories: "Danh mục thiết bị",
+    movements: "Lịch sử điều chuyển & sự cố",
     reports: "Báo cáo & Nhập Excel",
     users: "Quản trị người dùng"
   };
@@ -48,6 +50,7 @@ function showView(viewId) {
 
   if (viewId === "users") loadUsers();
   if (viewId === "categories") renderCategories();
+  if (viewId === "locations") renderLocations();
 }
 
 async function handleLogin(e) {
@@ -112,12 +115,14 @@ async function loadState() {
     STATE.devices = data.devices || [];
     STATE.movements = data.movements || [];
     STATE.categories = data.categories || [];
+    STATE.locations = data.locations || [];
 
     renderDashboard();
+    populateSelects();
     renderDevices();
     renderMovements();
     renderCategories();
-    populateSelects();
+    renderLocations();
 
     document.getElementById("syncStatus").innerText = "Đã đồng bộ";
   } catch (err) {
@@ -134,19 +139,39 @@ function renderDashboard() {
   ).length;
 }
 
-// BẢNG THIẾT BỊ VỚI CHECKBOX HÀNG LOẠT
-function renderDevices() {
-  const q = (document.getElementById("deviceSearch")?.value || "").toLowerCase();
-  const filtered = STATE.devices.filter(d =>
-    (d.code || "").toLowerCase().includes(q) ||
-    (d.name || "").toLowerCase().includes(q) ||
-    (d.model || "").toLowerCase().includes(q) ||
-    (d.serial || "").toLowerCase().includes(q) ||
-    (d.location || "").toLowerCase().includes(q)
-  );
+// BỘ LỌC ĐA NĂNG 3 LỚP (TỪ KHÓA + DANH MỤC + VỊ TRÍ)
+function getFilteredDevices() {
+  const q = (document.getElementById("deviceSearch")?.value || "").toLowerCase().trim();
+  const cat = document.getElementById("filterCategory")?.value || "";
+  const loc = document.getElementById("filterLocation")?.value || "";
 
+  return STATE.devices.filter(d => {
+    const matchQ = !q || (
+      (d.code || "").toLowerCase().includes(q) ||
+      (d.name || "").toLowerCase().includes(q) ||
+      (d.model || "").toLowerCase().includes(q) ||
+      (d.serial || "").toLowerCase().includes(q)
+    );
+    const matchCat = !cat || d.category === cat;
+    const matchLoc = !loc || d.location === loc;
+    return matchQ && matchCat && matchLoc;
+  });
+}
+
+function resetFilters() {
+  if (document.getElementById("deviceSearch")) document.getElementById("deviceSearch").value = "";
+  if (document.getElementById("filterCategory")) document.getElementById("filterCategory").value = "";
+  if (document.getElementById("filterLocation")) document.getElementById("filterLocation").value = "";
+  renderDevices();
+}
+
+function renderDevices() {
+  const filtered = getFilteredDevices();
   const tbody = document.getElementById("deviceTableBody");
+  const countEl = document.getElementById("filterResultCount");
   const isAdmin = STATE.currentUser?.role === "admin";
+
+  if (countEl) countEl.innerText = `Đang hiển thị ${filtered.length} / ${STATE.devices.length} thiết bị`;
 
   tbody.innerHTML = filtered.map(d => {
     const isChecked = selectedCodes.has(d.code);
@@ -159,12 +184,12 @@ function renderDevices() {
         <td><b>${d.code}</b></td>
         <td>
           <div><b>${d.name}</b></div>
-          ${d.notes ? `<small class="muted" style="display:block; max-width:250px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${d.notes}</small>` : ''}
+          ${d.notes ? `<small class="muted" style="display:block; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${d.notes}</small>` : ''}
         </td>
         <td>${d.model || "-"}</td>
         <td><code>${d.serial || "-"}</code></td>
         <td>${d.category || ""}</td>
-        <td>${d.location || "-"}</td>
+        <td><b>${d.location || "-"}</b></td>
         <td>
           <span class="badge ${
             d.status === 'Trong kho' ? 'badge-primary' : 
@@ -184,23 +209,15 @@ function renderDevices() {
   updateFloatingBar();
 }
 
-// LOGIC CHỌN NHIỀU CHECKBOX
 function toggleSelectDevice(code, isChecked) {
   if (isChecked) selectedCodes.add(code);
   else selectedCodes.delete(code);
   updateFloatingBar();
 }
 
-function toggleSelectAll(masterCheckbox) {
-  const q = (document.getElementById("deviceSearch")?.value || "").toLowerCase();
-  const filtered = STATE.devices.filter(d =>
-    (d.code || "").toLowerCase().includes(q) ||
-    (d.name || "").toLowerCase().includes(q) ||
-    (d.model || "").toLowerCase().includes(q) ||
-    (d.serial || "").toLowerCase().includes(q) ||
-    (d.location || "").toLowerCase().includes(q)
-  );
-
+// CHỌN TẤT CẢ THEO KẾT QUẢ ĐANG LỌC
+function toggleSelectAllFiltered(masterCheckbox) {
+  const filtered = getFilteredDevices();
   filtered.forEach(d => {
     if (masterCheckbox.checked) selectedCodes.add(d.code);
     else selectedCodes.delete(d.code);
@@ -228,26 +245,99 @@ function updateFloatingBar() {
   }
 }
 
+// ----------------------------------------------------
+// QUẢN LÝ VỊ TRÍ & KHO (LOCATIONS)
+// ----------------------------------------------------
+function renderLocations() {
+  const tbody = document.getElementById("locationTableBody");
+  if (!tbody) return;
+  const isAdmin = STATE.currentUser?.role === "admin";
+
+  tbody.innerHTML = STATE.locations.map((loc, idx) => {
+    const count = STATE.devices.filter(d => d.location === loc).length;
+    return `
+      <tr>
+        <td>${idx + 1}</td>
+        <td><b>${loc}</b></td>
+        <td><span class="badge badge-secondary">${count} thiết bị</span></td>
+        ${isAdmin ? `
+          <td style="text-align:right;">
+            <button onclick="renameLocation('\${loc}')" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button onclick="deleteLocation('\${loc}')" style="color:red; cursor:pointer;">Xóa</button>
+          </td>` : `<td></td>`}
+      </tr>
+    `;
+  }).join("");
+}
+
+async function openAddLocationModal() {
+  const name = prompt("Nhập tên Vị trí / Kho mới (Ví dụ: Tòa nhà B - Phòng Lab 3, Kho Tầng 2):");
+  if (!name || !name.trim()) return;
+  await callMutate("location.add", { name: name.trim() });
+  loadState();
+}
+
+async function renameLocation(oldName) {
+  const newName = prompt(`Đổi tên vị trí/kho "${oldName}" thành:`, oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+  await callMutate("location.update", { oldName, newName: newName.trim() });
+  loadState();
+}
+
+async function deleteLocation(name) {
+  if (!confirm(`Bạn có chắc muốn xóa vị trí "${name}"?`)) return;
+  await callMutate("location.delete", { name });
+  loadState();
+}
+
+// NẠP DANH SÁCH DROPDOWN CHUẨN HÓA
+function populateSelects() {
+  // Dropdown danh mục
+  const catOptions = STATE.categories.map(c => `<option value="${c}">${c}</option>`).join("");
+  const devCat = document.getElementById("devCategory");
+  if (devCat) devCat.innerHTML = catOptions;
+
+  const filterCat = document.getElementById("filterCategory");
+  if (filterCat) filterCat.innerHTML = `<option value="">-- Tất cả danh mục --</option>` + catOptions;
+
+  // Dropdown vị trí & kho
+  const locOptions = STATE.locations.map(l => `<option value="${l}">${l}</option>`).join("");
+  const devLoc = document.getElementById("devLocation");
+  if (devLoc) devLoc.innerHTML = locOptions;
+
+  const movLoc = document.getElementById("movToLocation");
+  if (movLoc) movLoc.innerHTML = locOptions;
+
+  const bulkLoc = document.getElementById("bulkToLocation");
+  if (bulkLoc) bulkLoc.innerHTML = locOptions;
+
+  const filterLoc = document.getElementById("filterLocation");
+  if (filterLoc) filterLoc.innerHTML = `<option value="">-- Tất cả vị trí & kho --</option>` + locOptions;
+
+  // Dropdown thiết bị
+  const movDev = document.getElementById("movDeviceCode");
+  if (movDev) movDev.innerHTML = STATE.devices.map(d => `<option value="${d.code}">${d.code} - ${d.name} (${d.location || 'Chưa gán'})</option>`).join("");
+}
+
 // ĐIỀU CHUYỂN HÀNG LOẠT
 function openBulkMovementModal() {
   document.getElementById("bulkMovementModal").classList.remove("hidden");
   document.getElementById("bulkModalDesc").innerText = `Đang thao tác cho ${selectedCodes.size} thiết bị đã chọn`;
-  handleBulkTypeChange();
 }
 
 function handleBulkTypeChange() {
   const type = document.getElementById("bulkType").value;
-  const toLocInput = document.getElementById("bulkToLocation");
-  if (type === "Báo hỏng / Đi bảo hành") toLocInput.value = "Kho kỹ thuật (Chờ sửa)";
-  else if (type === "Đã sửa xong / Nhập lại kho") toLocInput.value = "Kho dự phòng";
-  else if (type === "Báo thanh lý") toLocInput.value = "Kho thanh lý";
-  else toLocInput.value = "";
+  const bulkLoc = document.getElementById("bulkToLocation");
+  if (type === "Báo hỏng / Đi bảo hành") {
+    const defaultDamaged = STATE.locations.find(l => l.includes("Kho")) || STATE.locations[0];
+    if (defaultDamaged) bulkLoc.value = defaultDamaged;
+  }
 }
 
 async function handleSaveBulkMovement(e) {
   e.preventDefault();
   const type = document.getElementById("bulkType").value;
-  const toLocation = document.getElementById("bulkToLocation").value.trim();
+  const toLocation = document.getElementById("bulkToLocation").value;
   const note = document.getElementById("bulkNote").value.trim();
 
   let status = "Đang sử dụng";
@@ -269,13 +359,13 @@ async function handleSaveBulkMovement(e) {
 }
 
 async function bulkDeleteDevices() {
-  if (!confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedCodes.size} thiết bị đã chọn không?`)) return;
+  if (!confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedCodes.size} thiết bị đã chọn?`)) return;
   await callMutate("device.delete", { codes: Array.from(selectedCodes) });
   clearSelected();
   loadState();
 }
 
-// NHẬP DỮ LIỆU TỪ FILE CSV/EXCEL HÀNG LOẠT (BULK IMPORT)
+// NHẬP CSV
 function triggerImportCSV() {
   document.getElementById("csvFileInput").click();
 }
@@ -286,8 +376,7 @@ function handleFileSelect(e) {
 
   const reader = new FileReader();
   reader.onload = async function(evt) {
-    const text = evt.target.result;
-    parseAndImportCSV(text);
+    parseAndImportCSV(evt.target.result);
   };
   reader.readAsText(file, "UTF-8");
   e.target.value = "";
@@ -298,7 +387,6 @@ async function parseAndImportCSV(csvText) {
   if (lines.length < 2) return alert("File CSV rỗng hoặc thiếu tiêu đề");
 
   const items = [];
-  // Bỏ qua dòng tiêu đề [0], bắt đầu từ dòng 1
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"\$/g, ''));
     if (cols.length >= 2 && cols[0]) {
@@ -307,8 +395,8 @@ async function parseAndImportCSV(csvText) {
         name: cols[1] || cols[0],
         model: cols[2] || "",
         serial: cols[3] || "",
-        category: cols[4] || "Khác",
-        location: cols[5] || "Kho kỹ thuật",
+        category: cols[4] || (STATE.categories[0] || "Khác"),
+        location: cols[5] || (STATE.locations[0] || "Kho kỹ thuật"),
         status: cols[6] || "Trong kho",
         notes: cols[7] || ""
       });
@@ -320,13 +408,13 @@ async function parseAndImportCSV(csvText) {
   if (!confirm(`Đã tìm thấy ${items.length} thiết bị từ file. Bắt đầu nạp vào hệ thống?`)) return;
 
   document.getElementById("syncStatus").innerText = "Đang nạp dữ liệu...";
-  const res = await callMutate("device.bulk_add", { items });
+  await callMutate("device.bulk_add", { items });
   alert(`Đã nạp thành công thiết bị vào hệ thống!`);
   loadState();
 }
 
 function downloadSampleCSV() {
-  const sample = "\uFEFFMã thiết bị,Tên thiết bị,Model/Hãng,Serial/MAC,Danh mục,Vị trí,Tình trạng,Ghi chú\nSW-TEST-01,Switch 24p Cisco,WS-C2960,FOC111222,Switch mạng,Kho kỹ thuật,Trong kho,Nhập mẫu đợt 1\nAP-TEST-02,Access Point Ruijie,RG-AP720-L,RUIJIE8889,Access Point Wi-Fi,Kho kỹ thuật,Trong kho,Hàng dự phòng";
+  const sample = "\uFEFFMã thiết bị,Tên thiết bị,Model/Hãng,Serial/MAC,Danh mục,Vị trí,Tình trạng,Ghi chú\nSW-TEST-01,Switch 24p Cisco,WS-C2960,FOC111222,Switch mạng,Kho kỹ thuật - Tầng 1,Trong kho,Nhập đợt 1\nAP-TEST-02,Access Point Ruijie,RG-AP720-L,RUIJIE8889,Access Point Wi-Fi,Tòa nhà B - Phòng Lab 1,Đang sử dụng,Lắp trần";
   const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -336,21 +424,19 @@ function downloadSampleCSV() {
   document.body.removeChild(link);
 }
 
-// QUÉT QR / BARCODE BẰNG CAMERA
+// QUÉT QR
 function openScannerModal() {
   document.getElementById("scannerModal").classList.remove("hidden");
-  if (!html5QrCode) {
-    html5QrCode = new Html5Qrcode("qr-reader");
-  }
+  if (!html5QrCode) html5QrCode = new Html5Qrcode("qr-reader");
+
   html5QrCode.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: 250 },
     (decodedText) => {
-      // Khi quét trúng mã
       closeScannerModal();
       handleScannedResult(decodedText.trim());
     },
-    () => {} // Bỏ qua lỗi quét trượt mỗi khung hình
+    () => {}
   ).catch(err => {
     alert("Không thể khởi động camera: " + err);
     closeScannerModal();
@@ -370,7 +456,6 @@ function closeScannerModal() {
 }
 
 function handleScannedResult(code) {
-  // Tìm xem thiết bị có trong kho chưa
   const dev = STATE.devices.find(d => 
     d.code.toLowerCase() === code.toLowerCase() || 
     (d.serial && d.serial.toLowerCase() === code.toLowerCase())
@@ -386,24 +471,7 @@ function handleScannedResult(code) {
   }
 }
 
-// ----------------------------------------------------
-// THAO TÁC XUẤT NHẬP & DANH MỤC
-// ----------------------------------------------------
-function renderMovements() {
-  const tbody = document.getElementById("movementTableBody");
-  tbody.innerHTML = STATE.movements.map(m => `
-    <tr>
-      <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
-      <td><b>${m.deviceCode}</b></td>
-      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span></td>
-      <td>${m.fromLocation || "-"}</td>
-      <td><b>${m.toLocation || "-"}</b></td>
-      <td><small>${m.note || "-"}</small></td>
-      <td>${m.createdBy || "-"}</td>
-    </tr>
-  `).join("");
-}
-
+// DANH MỤC
 function renderCategories() {
   const tbody = document.getElementById("categoryTableBody");
   if (!tbody) return;
@@ -446,14 +514,7 @@ async function deleteCategory(name) {
   loadState();
 }
 
-function populateSelects() {
-  const devCat = document.getElementById("devCategory");
-  devCat.innerHTML = STATE.categories.map(c => `<option value="${c}">${c}</option>`).join("");
-
-  const movDev = document.getElementById("movDeviceCode");
-  movDev.innerHTML = STATE.devices.map(d => `<option value="${d.code}">${d.code} - ${d.name} (${d.status || 'Trong kho'})</option>`).join("");
-}
-
+// THIẾT BỊ
 function openDeviceModal(code = null) {
   document.getElementById("deviceModal").classList.remove("hidden");
   if (code) {
@@ -465,7 +526,7 @@ function openDeviceModal(code = null) {
     document.getElementById("devModel").value = dev.model || "";
     document.getElementById("devSerial").value = dev.serial || "";
     document.getElementById("devCategory").value = dev.category;
-    document.getElementById("devLocation").value = dev.location || "";
+    document.getElementById("devLocation").value = dev.location || STATE.locations[0];
     document.getElementById("devStatus").value = dev.status || "Trong kho";
     document.getElementById("devNotes").value = dev.notes || "";
   } else {
@@ -475,7 +536,7 @@ function openDeviceModal(code = null) {
     document.getElementById("devName").value = "";
     document.getElementById("devModel").value = "";
     document.getElementById("devSerial").value = "";
-    document.getElementById("devLocation").value = "Kho kỹ thuật";
+    document.getElementById("devLocation").value = STATE.locations[0] || "";
     document.getElementById("devNotes").value = "";
   }
 }
@@ -489,7 +550,7 @@ async function handleSaveDevice(e) {
   const model = document.getElementById("devModel").value.trim();
   const serial = document.getElementById("devSerial").value.trim();
   const category = document.getElementById("devCategory").value;
-  const location = document.getElementById("devLocation").value.trim();
+  const location = document.getElementById("devLocation").value;
   const status = document.getElementById("devStatus").value;
   const notes = document.getElementById("devNotes").value.trim();
   const isEdit = document.getElementById("devCode").readOnly;
@@ -519,24 +580,23 @@ function handleMovementTypeChange() {
   const type = document.getElementById("movType").value;
   const devCode = document.getElementById("movDeviceCode").value;
   const dev = STATE.devices.find(d => d.code === devCode);
-  const toLocInput = document.getElementById("movToLocation");
+  const toLocSelect = document.getElementById("movToLocation");
   const noteInput = document.getElementById("movNote");
 
   if (type === "Báo hỏng / Đi bảo hành") {
-    toLocInput.value = "Kho kỹ thuật (Chờ kiểm tra / Sửa chữa)";
-    noteInput.placeholder = "VD: Cháy nguồn do sét, hỏng cổng quang...";
+    const loc = STATE.locations.find(l => l.includes("Kho")) || STATE.locations[0];
+    if (loc) toLocSelect.value = loc;
+    noteInput.placeholder = "VD: Cháy nguồn, hỏng quạt...";
   } else if (type === "Đã sửa xong / Nhập lại kho") {
-    toLocInput.value = "Kho thiết bị dự phòng";
-    noteInput.placeholder = "VD: Đã thay nguồn mới, kiểm tra hoạt động tốt";
+    const loc = STATE.locations.find(l => l.includes("dự phòng") || l.includes("Kho")) || STATE.locations[0];
+    if (loc) toLocSelect.value = loc;
+    noteInput.placeholder = "VD: Đã thay linh kiện, hoạt động tốt";
   } else if (type === "Báo thanh lý") {
-    toLocInput.value = "Kho phế liệu / Chờ thanh lý";
-    noteInput.placeholder = "VD: Hỏng bo mạch không linh kiện, Lập BB số...";
-  } else if (type === "Xuất kho") {
-    toLocInput.value = dev?.location && dev.location.includes("Kho") ? "" : (dev?.location || "");
-    toLocInput.placeholder = "VD: Tủ Rack Tầng 2, Phòng Lab 1...";
-    noteInput.placeholder = "VD: Bàn giao theo yêu cầu Khoa...";
+    const loc = STATE.locations.find(l => l.includes("thanh lý")) || STATE.locations[0];
+    if (loc) toLocSelect.value = loc;
+    noteInput.placeholder = "VD: Hỏng bo mạch chính không thể sửa...";
   } else {
-    toLocInput.value = dev?.location || "";
+    if (dev?.location) toLocSelect.value = dev.location;
     noteInput.placeholder = "Ghi chú thêm...";
   }
 }
@@ -545,7 +605,7 @@ async function handleSaveMovement(e) {
   e.preventDefault();
   const deviceCode = document.getElementById("movDeviceCode").value;
   const type = document.getElementById("movType").value;
-  const toLocation = document.getElementById("movToLocation").value.trim();
+  const toLocation = document.getElementById("movToLocation").value;
   const note = document.getElementById("movNote").value.trim();
   const dev = STATE.devices.find(d => d.code === deviceCode);
 
@@ -567,6 +627,21 @@ async function handleSaveMovement(e) {
   loadState();
 }
 
+function renderMovements() {
+  const tbody = document.getElementById("movementTableBody");
+  tbody.innerHTML = STATE.movements.map(m => `
+    <tr>
+      <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
+      <td><b>${m.deviceCode}</b></td>
+      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span></td>
+      <td>${m.fromLocation || "-"}</td>
+      <td><b>${m.toLocation || "-"}</b></td>
+      <td><small>${m.note || "-"}</small></td>
+      <td>${m.createdBy || "-"}</td>
+    </tr>
+  `).join("");
+}
+
 async function callMutate(action, payload) {
   const token = localStorage.getItem("kho_token");
   const res = await fetch(`${API_BASE_URL}/api/mutate`, {
@@ -583,7 +658,7 @@ async function callMutate(action, payload) {
   return data;
 }
 
-// BÁO CÁO XUẤT CSV
+// BÁO CÁO CSV
 function downloadCSV(filename, rows) {
   const processRow = function (row) {
     let finalVal = '';
@@ -627,7 +702,7 @@ function exportMovementsCSV() {
   downloadCSV(`lich_su_dieu_chuyen_${new Date().toISOString().slice(0,10)}.csv`, rows);
 }
 
-// QUẢN TRỊ USER
+// USER
 async function loadUsers() {
   const token = localStorage.getItem("kho_token");
   try {
