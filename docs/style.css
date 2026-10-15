@@ -137,7 +137,7 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
 .eyebrow {
@@ -184,6 +184,25 @@ h1 { font-size: 1.85rem; font-weight: 700; }
   align-items: center;
   margin-bottom: 1.25rem;
   gap: 1rem;
+}
+
+.toolbar-stacked {
+  background: #fff;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.filter-bar {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-bar input, .filter-bar select {
+  margin: 0;
 }
 
 .table-card { overflow: hidden; }
@@ -233,6 +252,7 @@ button {
   cursor: pointer;
   border: none;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 button.primary { background: var(--primary); color: #fff; }
@@ -250,6 +270,7 @@ input, select {
   outline: none;
   margin-top: 4px;
   margin-bottom: 12px;
+  background: #fff;
 }
 
 input:focus, select:focus {
@@ -283,7 +304,6 @@ input:focus, select:focus {
   margin-top: 1.5rem;
 }
 
-/* THANH NỔI FLOATING BAR CHO THAO TÁC HÀNG LOẠT */
 .floating-bar {
   position: fixed;
   bottom: 24px;
@@ -304,4 +324,5 @@ input:focus, select:focus {
 
 @media (max-width: 900px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .filter-bar { grid-template-columns: 1fr; }
 }
