@@ -50,6 +50,9 @@
         <button class="nav-btn" onclick="showView('categories')">
           <span class="icon">📁</span> <span>Danh mục</span>
         </button>
+        <button class="nav-btn" onclick="showView('reports')">
+          <span class="icon">📑</span> <span>Báo cáo</span>
+        </button>
         <button class="nav-btn admin-only" onclick="showView('users')">
           <span class="icon">👥</span> <span>Người dùng</span>
         </button>
@@ -97,7 +100,7 @@
       <!-- TAB 2: THIẾT BỊ -->
       <section id="devices" class="view hidden">
         <div class="toolbar">
-          <input type="text" id="deviceSearch" placeholder="Tìm kiếm theo mã, tên, vị trí..." oninput="renderDevices()">
+          <input type="text" id="deviceSearch" placeholder="Tìm theo mã, tên, serial, vị trí..." oninput="renderDevices()">
           <button class="primary admin-only" onclick="openDeviceModal()">+ Thêm thiết bị</button>
         </div>
         <div class="card table-card">
@@ -106,6 +109,8 @@
               <tr>
                 <th>Mã</th>
                 <th>Tên thiết bị</th>
+                <th>Model / Hãng</th>
+                <th>Serial / MAC</th>
                 <th>Danh mục</th>
                 <th>Vị trí</th>
                 <th>Tình trạng</th>
@@ -122,7 +127,7 @@
         <div class="toolbar">
           <div>
             <h2>Lịch sử xuất / nhập kho</h2>
-            <p class="muted">Theo dõi lịch sử dịch chuyển và bàn giao tài sản</p>
+            <p class="muted">Theo dõi nhật ký điều chuyển tài sản</p>
           </div>
           <button class="primary admin-only" onclick="openMovementModal()">+ Tạo phiếu xuất/nhập</button>
         </div>
@@ -143,15 +148,43 @@
         </div>
       </section>
 
-      <!-- TAB 4: DANH MỤC -->
+      <!-- TAB 4: DANH MỤC (CÓ THÊM, SỬA, XÓA) -->
       <section id="categories" class="view hidden">
-        <div class="card">
-          <h2>Danh mục phân loại thiết bị</h2>
-          <ul id="categoryList" class="category-list"></ul>
+        <div class="toolbar">
+          <div>
+            <h2>Danh mục phân loại thiết bị</h2>
+            <p class="muted">Quản lý các nhóm thiết bị hạ tầng</p>
+          </div>
+          <button class="primary admin-only" onclick="openAddCategoryModal()">+ Thêm danh mục</button>
+        </div>
+        <div class="card table-card">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width:60px;">STT</th>
+                <th>Tên danh mục</th>
+                <th>Số lượng thiết bị</th>
+                <th class="admin-only" style="text-align:right;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="categoryTableBody"></tbody>
+          </table>
         </div>
       </section>
 
-      <!-- TAB 5: QUẢN LÝ NGƯỜI DÙNG -->
+      <!-- TAB 5: BÁO CÁO (XUẤT EXCEL/CSV) -->
+      <section id="reports" class="view hidden">
+        <div class="card" style="padding: 2rem;">
+          <h2>Báo cáo & Xuất dữ liệu kho</h2>
+          <p class="muted" style="margin-top: 5px;">Tải dữ liệu danh sách thiết bị và lịch sử xuất nhập kho về máy tính</p>
+          <div style="display:flex; gap:15px; margin-top:1.5rem;">
+            <button class="primary" onclick="exportDevicesCSV()">📥 Tải danh sách thiết bị (.CSV)</button>
+            <button class="secondary" onclick="exportMovementsCSV()">📥 Tải lịch sử xuất nhập (.CSV)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: QUẢN LÝ NGƯỜI DÙNG -->
       <section id="users" class="view hidden">
         <div class="toolbar">
           <div>
@@ -177,7 +210,7 @@
     </main>
   </div>
 
-  <!-- MODAL THÊM / SỬA THIẾT BỊ -->
+  <!-- MODAL THÊM / SỬA THIẾT BỊ (ĐẦY ĐỦ TRƯỜNG DỮ LIỆU) -->
   <div id="deviceModal" class="modal hidden">
     <div class="modal-card card">
       <h3 id="deviceModalTitle">Thêm thiết bị mới</h3>
@@ -185,11 +218,15 @@
         <label>Mã thiết bị (*)</label>
         <input type="text" id="devCode" required placeholder="VD: SW-C3560-01">
         <label>Tên thiết bị (*)</label>
-        <input type="text" id="devName" required placeholder="VD: Cisco Catalyst 3560">
+        <input type="text" id="devName" required placeholder="VD: Switch Cisco Catalyst 3560">
+        <label>Model / Nhãn hiệu</label>
+        <input type="text" id="devModel" placeholder="VD: WS-C3560-24PS-S">
+        <label>Số Serial / Địa chỉ MAC</label>
+        <input type="text" id="devSerial" placeholder="VD: FOC12345678">
         <label>Danh mục</label>
         <select id="devCategory"></select>
         <label>Vị trí</label>
-        <input type="text" id="devLocation" placeholder="VD: Phòng Server Tầng 3">
+        <input type="text" id="devLocation" placeholder="VD: Tủ Rack Tầng 2, Phòng Server">
         <label>Tình trạng</label>
         <select id="devStatus">
           <option value="Trong kho">Trong kho</option>
@@ -197,6 +234,8 @@
           <option value="Hỏng / Bảo hành">Hỏng / Bảo hành</option>
           <option value="Thanh lý">Thanh lý</option>
         </select>
+        <label>Ghi chú</label>
+        <input type="text" id="devNotes" placeholder="Ghi chú thêm về thông số, tình trạng...">
         <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('deviceModal')">Hủy</button>
           <button type="submit" class="primary">Lưu thiết bị</button>
