@@ -23,7 +23,7 @@ function setElementValueSafe(id, val, isSelect = false) {
   }
 }
 
-// Bật Modal
+// Bật Modal chắc chắn hiển thị (vượt qua mọi xung đột CSS)
 function showModalById(id) {
   const m = document.getElementById(id);
   if (!m) return;
@@ -32,7 +32,7 @@ function showModalById(id) {
   m.style.setProperty("display", "flex", "important");
 }
 
-// Đóng Modal
+// Đóng Modal an toàn
 function closeModal(id) {
   const m = document.getElementById(id);
   if (!m) return;
@@ -41,11 +41,10 @@ function closeModal(id) {
   m.style.setProperty("display", "none", "important");
 }
 
-// BỘ LẮNG NGHE SỰ KIỆN CLICK TOÀN CỤC
+// BỘ ĐIỀU PHỐI SỰ KIỆN CLICK TOÀN CỤC (LOẠI BỎ 100% LỖI CÚ PHÁP CHUỖI)
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-act]");
   if (!btn) return;
-  e.preventDefault();
 
   const act = btn.getAttribute("data-act");
   const val = btn.getAttribute("data-val") || "";
@@ -67,6 +66,7 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// LẮNG NGHE SỰ KIỆN CHỌN CHECKBOX THIẾT BỊ
 document.addEventListener("change", (e) => {
   const chk = e.target.closest("input.dev-check");
   if (chk) {
@@ -249,7 +249,6 @@ function resetFilters() {
   renderDevices();
 }
 
-// RENDER BẢNG: TINH GỌN CỘT VÀ CỤM NÚT THAO TÁC
 function renderDevices() {
   const filtered = getFilteredDevices();
   const tbody = document.getElementById("deviceTableBody");
@@ -264,13 +263,13 @@ function renderDevices() {
     return `
       <tr>
         ${isAdmin ? `
-          <td style="width:30px;">
+          <td>
             <input type="checkbox" class="dev-check" value="${d.code}" ${isChecked ? 'checked' : ''}>
           </td>` : `<td></td>`}
         <td><b>${d.code}</b></td>
         <td>
           <div><b>${d.name || d.code}</b></div>
-          ${d.notes ? `<small class="muted" style="display:block; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${d.notes}</small>` : ''}
+          ${d.notes ? `<small class="muted" style="display:block; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${d.notes}</small>` : ''}
         </td>
         <td>${d.model || "-"}</td>
         <td><code>${d.serial || "-"}</code></td>
@@ -283,12 +282,10 @@ function renderDevices() {
           }">${d.status || "Trong kho"}</span>
         </td>
         ${isAdmin ? `
-          <td style="text-align:right;">
-            <div class="action-btn-group">
-              <button type="button" class="primary btn-action-sm" data-act="quick-mov" data-val="\${d.code}" title="Điều chuyển / Báo sự cố">Chuyển</button>
-              <button type="button" class="secondary btn-action-sm" data-act="edit-dev" data-val="\${d.code}" title="Sửa thiết bị">Sửa</button>
-              <button type="button" class="secondary btn-action-sm" data-act="del-dev" data-val="\${d.code}" style="color:red;" title="Xóa thiết bị">Xóa</button>
-            </div>
+          <td style="text-align:right; white-space:nowrap;">
+            <button type="button" data-act="quick-mov" data-val="${d.code}" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
+            <button type="button" data-act="edit-dev" data-val="${d.code}" style="cursor:pointer; margin-right:4px;">Sửa</button>
+            <button type="button" data-act="del-dev" data-val="${d.code}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -327,10 +324,10 @@ function updateFloatingBar() {
   if (selectedCodes.size > 0 && STATE.currentUser?.role === "admin") {
     if (countEl) countEl.innerText = selectedCodes.size;
     bar.classList.remove("hidden");
-    bar.classList.add("active");
+    bar.style.setProperty("display", "flex", "important");
   } else {
     bar.classList.add("hidden");
-    bar.classList.remove("active");
+    bar.style.setProperty("display", "none", "important");
   }
 }
 
@@ -379,14 +376,9 @@ function openDeviceModal(deviceCode = null) {
   setElementValueSafe("devNotes", "");
 }
 
-async function deleteDeviceByCode(code) {
+function deleteDeviceByCode(code) {
   if (!confirm(`Bạn có chắc chắn muốn xóa thiết bị [${code}]?`)) return;
-  try {
-    await callMutate("device.delete", { code });
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  callMutate("device.delete", { code }).then(() => loadState());
 }
 
 async function handleSaveDevice(e) {
@@ -402,42 +394,32 @@ async function handleSaveDevice(e) {
   const isEdit = document.getElementById("devCode")?.readOnly;
 
   const action = isEdit ? "device.update" : "device.add";
-  try {
-    await callMutate(action, { code, name, model, serial, category, location, status, notes });
-    closeModal("deviceModal");
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate(action, { code, name, model, serial, category, location, status, notes });
+  closeModal("deviceModal");
+  loadState();
 }
 
 // ----------------------------------------------------
-// ĐIỀU CHUYỂN / BÁO SỰ CỐ (ĐÃ SỬA CHUẨN XÁC CHỌN ĐÚNG MÃ)
+// ĐIỀU CHUYỂN / BÁO SỰ CỐ
 // ----------------------------------------------------
 function openMovementModal(deviceCode = null) {
   populateSelects();
   showModalById("movementModal");
 
-  const clean = String(deviceCode || "").trim().toLowerCase();
-  const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
-
-  const devSelect = document.getElementById("movDeviceCode");
-  if (dev && devSelect) {
-    // Ép chọn chính xác giá trị máy được click
-    devSelect.value = dev.code;
-    setElementValueSafe("movToLocation", dev.location || "", true);
+  if (deviceCode) {
+    const clean = String(deviceCode).trim().toLowerCase();
+    const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
+    if (dev) {
+      setElementValueSafe("movDeviceCode", dev.code, true);
+      setElementValueSafe("movToLocation", dev.location || "", true);
+    }
   }
 
   handleMovementTypeChange();
 }
 
 function handleSelectDeviceForMovement() {
-  const devCode = document.getElementById("movDeviceCode")?.value;
-  const clean = String(devCode || "").trim().toLowerCase();
-  const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
-  if (dev && dev.location) {
-    setElementValueSafe("movToLocation", dev.location, true);
-  }
+  handleMovementTypeChange();
 }
 
 function handleMovementTypeChange() {
@@ -445,8 +427,7 @@ function handleMovementTypeChange() {
   if (!typeEl) return;
   const type = typeEl.value;
   const devCode = document.getElementById("movDeviceCode")?.value;
-  const clean = String(devCode || "").trim().toLowerCase();
-  const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
+  const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(devCode).toLowerCase());
   const noteInput = document.getElementById("movNote");
 
   if (type === "Báo hỏng / Đi bảo hành") {
@@ -463,7 +444,7 @@ function handleMovementTypeChange() {
     if (noteInput) noteInput.placeholder = "VD: Hỏng bo mạch chính không thể sửa...";
   } else {
     if (dev?.location) setElementValueSafe("movToLocation", dev.location, true);
-    if (noteInput) noteInput.placeholder = "Ghi chú điều chuyển...";
+    if (noteInput) noteInput.placeholder = "Ghi chú thêm...";
   }
 }
 
@@ -473,29 +454,24 @@ async function handleSaveMovement(e) {
   const type = document.getElementById("movType")?.value;
   const toLocation = document.getElementById("movToLocation")?.value;
   const note = (document.getElementById("movNote")?.value || "").trim();
-  const clean = String(deviceCode || "").trim().toLowerCase();
-  const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
+  const dev = STATE.devices.find(d => d.code === deviceCode);
 
-  let newStatus = dev ? (dev.status || "Đang sử dụng") : "Đang sử dụng";
+  let newStatus = "Đang sử dụng";
   if (type === "Báo hỏng / Đi bảo hành") newStatus = "Hỏng / Bảo hành";
   else if (type === "Đã sửa xong / Nhập lại kho") newStatus = "Trong kho";
   else if (type === "Báo thanh lý") newStatus = "Thanh lý";
-  else if (type === "Xuất kho") newStatus = "Đang sử dụng";
 
-  try {
-    await callMutate("movement.create", {
-      deviceCode: dev ? dev.code : deviceCode,
-      type,
-      fromLocation: dev ? dev.location : "",
-      toLocation,
-      status: newStatus,
-      note
-    });
-    closeModal("movementModal");
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("movement.create", {
+    deviceCode,
+    type,
+    fromLocation: dev ? dev.location : "",
+    toLocation,
+    status: newStatus,
+    note
+  });
+
+  closeModal("movementModal");
+  loadState();
 }
 
 function renderMovements() {
@@ -526,15 +502,13 @@ function renderLocations() {
     const count = STATE.devices.filter(d => String(d.location).trim().toLowerCase() === String(loc).trim().toLowerCase()).length;
     return `
       <tr>
-        <td style="width: 50px;">${idx + 1}</td>
+        <td>${idx + 1}</td>
         <td><b>${loc}</b></td>
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
-            <div class="action-btn-group">
-              <button type="button" class="secondary btn-action-sm" data-act="rename-loc" data-val="\${loc}">Đổi tên</button>
-              <button type="button" class="secondary btn-action-sm" data-act="del-loc" data-val="\${loc}" style="color:red;">Xóa</button>
-            </div>
+            <button type="button" data-act="rename-loc" data-val="${loc}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button type="button" data-act="del-loc" data-val="${loc}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -544,33 +518,21 @@ function renderLocations() {
 async function openAddLocationModal() {
   const name = prompt("Nhập tên Vị trí / Kho mới:");
   if (!name || !name.trim()) return;
-  try {
-    await callMutate("location.add", { name: name.trim() });
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("location.add", { name: name.trim() });
+  await loadState();
 }
 
 async function renameLocation(oldName) {
   const newName = prompt(`Đổi tên vị trí/kho "${oldName}" thành:`, oldName);
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
-  try {
-    await callMutate("location.update", { oldName: oldName.trim(), newName: newName.trim() });
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("location.update", { oldName, newName: newName.trim() });
+  await loadState();
 }
 
 async function deleteLocation(name) {
   if (!confirm(`Bạn có chắc muốn xóa vị trí "${name}"?`)) return;
-  try {
-    await callMutate("location.delete", { name: name.trim() });
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("location.delete", { name });
+  await loadState();
 }
 
 // ----------------------------------------------------
@@ -585,15 +547,13 @@ function renderCategories() {
     const count = STATE.devices.filter(d => String(d.category).trim().toLowerCase() === String(cat).trim().toLowerCase()).length;
     return `
       <tr>
-        <td style="width: 50px;">${idx + 1}</td>
+        <td>${idx + 1}</td>
         <td><b>${cat}</b></td>
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
-            <div class="action-btn-group">
-              <button type="button" class="secondary btn-action-sm" data-act="rename-cat" data-val="\${cat}">Đổi tên</button>
-              <button type="button" class="secondary btn-action-sm" data-act="del-cat" data-val="\${cat}" style="color:red;">Xóa</button>
-            </div>
+            <button type="button" data-act="rename-cat" data-val="${cat}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button type="button" data-act="del-cat" data-val="${cat}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -603,36 +563,24 @@ function renderCategories() {
 async function openAddCategoryModal() {
   const name = prompt("Nhập tên danh mục mới:");
   if (!name || !name.trim()) return;
-  try {
-    await callMutate("category.add", { name: name.trim() });
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("category.add", { name: name.trim() });
+  await loadState();
 }
 
 async function renameCategory(oldName) {
   const newName = prompt(`Đổi tên danh mục "${oldName}" thành:`, oldName);
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
-  try {
-    await callMutate("category.update", { oldName: oldName.trim(), newName: newName.trim() });
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("category.update", { oldName, newName: newName.trim() });
+  await loadState();
 }
 
 async function deleteCategory(name) {
   if (!confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) return;
-  try {
-    await callMutate("category.delete", { name });
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("category.delete", { name });
+  await loadState();
 }
 
-// NẠP DỮ LIỆU SELECT DROPDOWN (ĐẢM BẢO VALUE TRÙNG KHỚP VỚI MÃ THIẾT BỊ)
+// NẠP DỮ LIỆU SELECT DROPDOWN
 function populateSelects() {
   const catOptions = STATE.categories.map(c => `<option value="${c}">${c}</option>`).join("");
   const devCat = document.getElementById("devCategory");
@@ -686,31 +634,24 @@ async function handleSaveBulkMovement(e) {
   else if (type === "Đã sửa xong / Nhập lại kho") status = "Trong kho";
   else if (type === "Báo thanh lý") status = "Thanh lý";
 
-  try {
-    await callMutate("movement.bulk_create", {
-      codes: Array.from(selectedCodes),
-      type,
-      toLocation,
-      status,
-      note
-    });
-    closeModal("bulkMovementModal");
-    clearSelected();
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("movement.bulk_create", {
+    codes: Array.from(selectedCodes),
+    type,
+    toLocation,
+    status,
+    note
+  });
+
+  closeModal("bulkMovementModal");
+  clearSelected();
+  loadState();
 }
 
 async function bulkDeleteDevices() {
   if (!confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedCodes.size} thiết bị đã chọn?`)) return;
-  try {
-    await callMutate("device.delete", { codes: Array.from(selectedCodes) });
-    clearSelected();
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("device.delete", { codes: Array.from(selectedCodes) });
+  clearSelected();
+  loadState();
 }
 
 // NHẬP CSV
@@ -757,13 +698,9 @@ async function parseAndImportCSV(csvText) {
 
   const statusEl = document.getElementById("syncStatus");
   if (statusEl) statusEl.innerText = "Đang nạp dữ liệu...";
-  try {
-    await callMutate("device.bulk_add", { items });
-    alert(`Đã nạp thành công thiết bị vào hệ thống!`);
-    await loadState();
-  } catch (err) {
-    console.error(err);
-  }
+  await callMutate("device.bulk_add", { items });
+  alert(`Đã nạp thành công thiết bị vào hệ thống!`);
+  loadState();
 }
 
 function downloadSampleCSV() {
@@ -907,7 +844,7 @@ async function loadUsers() {
         <td><span class="badge ${u.role === 'admin' ? 'badge-primary' : 'badge-secondary'}">${u.role === 'admin' ? 'Quản trị viên' : 'Chỉ xem (Viewer)'}</span></td>
         <td style="text-align:right;">
           ${u.username.toLowerCase() !== 'admin' ? `
-            <button type="button" onclick="deleteUser('\${u.username}')" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" onclick="deleteUser('${u.username}')" style="color:red; cursor:pointer;">Xóa</button>
           ` : '<small class="muted">Tài khoản chính</small>'}
         </td>
       </tr>
