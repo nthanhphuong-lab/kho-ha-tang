@@ -263,7 +263,7 @@
   </div>
 
   <!-- THANH NỔI KHI CHỌN HÀNG LOẠT -->
-  <div id="floatingBar" class="floating-bar hidden">
+  <div id="floatingBar" class="floating-bar">
     <span>Đã chọn <b id="selectedCount">0</b> thiết bị</span>
     <div style="display:flex; gap:8px;">
       <button class="primary" onclick="openBulkMovementModal()">🔄 Điều chuyển hàng loạt</button>
@@ -273,7 +273,7 @@
   </div>
 
   <!-- MODAL THÊM / SỬA THIẾT BỊ -->
-  <div id="deviceModal" class="modal hidden">
+  <div id="deviceModal" class="modal">
     <div class="modal-card card">
       <h3 id="deviceModalTitle">Thêm thiết bị mới</h3>
       <form onsubmit="handleSaveDevice(event)">
@@ -307,7 +307,7 @@
   </div>
 
   <!-- MODAL ĐIỀU CHUYỂN ĐƠN LẺ -->
-  <div id="movementModal" class="modal hidden">
+  <div id="movementModal" class="modal">
     <div class="modal-card card">
       <h3 id="movementModalTitle">Tạo phiếu điều chuyển / Báo sự cố</h3>
       <form onsubmit="handleSaveMovement(event)">
@@ -334,7 +334,7 @@
   </div>
 
   <!-- MODAL ĐIỀU CHUYỂN HÀNG LOẠT -->
-  <div id="bulkMovementModal" class="modal hidden">
+  <div id="bulkMovementModal" class="modal">
     <div class="modal-card card">
       <h3>Điều chuyển hàng loạt thiết bị</h3>
       <p class="muted" id="bulkModalDesc">Áp dụng cho các thiết bị đã chọn</p>
@@ -359,7 +359,7 @@
   </div>
 
   <!-- MODAL QUÉT QR BẰNG CAMERA -->
-  <div id="scannerModal" class="modal hidden">
+  <div id="scannerModal" class="modal">
     <div class="modal-card card" style="max-width:440px;">
       <h3>Quét mã Barcode / QR Code</h3>
       <p class="muted">Đưa mã vạch hoặc mã QR vào khung camera</p>
@@ -371,7 +371,7 @@
   </div>
 
   <!-- MODAL USER -->
-  <div id="userModal" class="modal hidden">
+  <div id="userModal" class="modal">
     <div class="modal-card card">
       <h3>Thêm người dùng</h3>
       <form onsubmit="handleSaveUser(event)">
