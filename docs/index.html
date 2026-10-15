@@ -5,12 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kho Hạ Tầng CNTT</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Thư viện quét mã vạch / QR qua Camera (siêu nhẹ, không tải nặng) -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
-  <!-- MÀN HÌNH ĐĂNG NHẬP -->
+  <!-- ĐĂNG NHẬP -->
   <div id="login" class="login">
     <div class="card login-card">
       <div class="logo">K</div>
@@ -45,11 +44,14 @@
         <button class="nav-btn" onclick="showView('devices')">
           <span class="icon">💻</span> <span>Thiết bị</span>
         </button>
-        <button class="nav-btn" onclick="showView('movements')">
-          <span class="icon">🔄</span> <span>Xuất / Nhập / Sự cố</span>
+        <button class="nav-btn" onclick="showView('locations')">
+          <span class="icon">🏢</span> <span>Vị trí & Kho</span>
         </button>
         <button class="nav-btn" onclick="showView('categories')">
           <span class="icon">📁</span> <span>Danh mục</span>
+        </button>
+        <button class="nav-btn" onclick="showView('movements')">
+          <span class="icon">🔄</span> <span>Xuất / Nhập / Sự cố</span>
         </button>
         <button class="nav-btn" onclick="showView('reports')">
           <span class="icon">📑</span> <span>Báo cáo & Nhập Excel</span>
@@ -100,29 +102,42 @@
         </div>
       </section>
 
-      <!-- TAB 2: DANH SÁCH THIẾT BỊ -->
+      <!-- TAB 2: DANH SÁCH THIẾT BỊ VỚI BỘ LỌC 3 LỚP -->
       <section id="devices" class="view hidden">
-        <div class="toolbar">
-          <input type="text" id="deviceSearch" placeholder="Tìm kiếm nhanh mã, tên, serial, vị trí..." oninput="renderDevices()">
-          <div style="display:flex; gap:8px;">
-            <button class="secondary admin-only" onclick="triggerImportCSV()">📥 Nhập từ Excel/CSV</button>
-            <input type="file" id="csvFileInput" accept=".csv" style="display:none;" onchange="handleFileSelect(event)">
-            <button class="primary admin-only" onclick="openDeviceModal()">+ Thêm thiết bị</button>
+        <div class="toolbar-stacked">
+          <div class="filter-bar">
+            <input type="text" id="deviceSearch" placeholder="🔍 Tìm theo mã, tên, serial..." oninput="renderDevices()">
+            <select id="filterCategory" onchange="renderDevices()">
+              <option value="">-- Tất cả danh mục --</option>
+            </select>
+            <select id="filterLocation" onchange="renderDevices()">
+              <option value="">-- Tất cả vị trí & kho --</option>
+            </select>
+            <button class="secondary" onclick="resetFilters()">Đặt lại</button>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+            <div id="filterResultCount" class="muted">Đang hiển thị 0 thiết bị</div>
+            <div style="display:flex; gap:8px;">
+              <button class="secondary admin-only" onclick="triggerImportCSV()">📥 Nhập từ Excel/CSV</button>
+              <input type="file" id="csvFileInput" accept=".csv" style="display:none;" onchange="handleFileSelect(event)">
+              <button class="primary admin-only" onclick="openDeviceModal()">+ Thêm thiết bị</button>
+            </div>
           </div>
         </div>
-        <div class="card table-card">
+
+        <div class="card table-card" style="margin-top:10px;">
           <table class="table">
             <thead>
               <tr>
                 <th style="width:40px;" class="admin-only">
-                  <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                  <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllFiltered(this)">
                 </th>
                 <th>Mã</th>
                 <th>Tên thiết bị</th>
                 <th>Model / Hãng</th>
                 <th>Serial / MAC</th>
                 <th>Danh mục</th>
-                <th>Vị trí</th>
+                <th>Vị trí / Kho</th>
                 <th>Tình trạng</th>
                 <th class="admin-only" style="text-align:right;">Thao tác nhanh</th>
               </tr>
@@ -132,29 +147,26 @@
         </div>
       </section>
 
-      <!-- TAB 3: XUẤT NHẬP & SỰ CỐ -->
-      <section id="movements" class="view hidden">
+      <!-- TAB 3: QUẢN LÝ VỊ TRÍ & KHO (LOCATIONS) -->
+      <section id="locations" class="view hidden">
         <div class="toolbar">
           <div>
-            <h2>Lịch sử điều chuyển & sự cố</h2>
-            <p class="muted">Toàn bộ nhật ký xuất/nhập/bảo hành được ghi nhận</p>
+            <h2>Danh bạ Vị trí & Kho lưu trữ</h2>
+            <p class="muted">Chuẩn hóa tên các kho và vị trí lắp đặt (Tòa nhà, Tủ rack, Phòng Lab)</p>
           </div>
-          <button class="primary admin-only" onclick="openMovementModal()">+ Tạo phiếu xuất/nhập</button>
+          <button class="primary admin-only" onclick="openAddLocationModal()">+ Thêm Vị trí / Kho</button>
         </div>
         <div class="card table-card">
           <table class="table">
             <thead>
               <tr>
-                <th>Thời gian</th>
-                <th>Mã thiết bị</th>
-                <th>Loại giao dịch</th>
-                <th>Từ vị trí</th>
-                <th>Đến vị trí</th>
-                <th>Ghi chú / Lý do</th>
-                <th>Người thực hiện</th>
+                <th style="width:60px;">STT</th>
+                <th>Tên Vị trí / Kho lưu trữ</th>
+                <th>Số lượng thiết bị đang đặt</th>
+                <th class="admin-only" style="text-align:right;">Thao tác</th>
               </tr>
             </thead>
-            <tbody id="movementTableBody"></tbody>
+            <tbody id="locationTableBody"></tbody>
           </table>
         </div>
       </section>
@@ -183,7 +195,34 @@
         </div>
       </section>
 
-      <!-- TAB 5: BÁO CÁO & XUẤT NHẬP EXCEL -->
+      <!-- TAB 5: XUẤT NHẬP & SỰ CỐ -->
+      <section id="movements" class="view hidden">
+        <div class="toolbar">
+          <div>
+            <h2>Lịch sử điều chuyển & sự cố</h2>
+            <p class="muted">Toàn bộ nhật ký xuất/nhập/bảo hành</p>
+          </div>
+          <button class="primary admin-only" onclick="openMovementModal()">+ Tạo phiếu xuất/nhập</button>
+        </div>
+        <div class="card table-card">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Mã thiết bị</th>
+                <th>Loại giao dịch</th>
+                <th>Từ vị trí</th>
+                <th>Đến vị trí</th>
+                <th>Ghi chú / Lý do</th>
+                <th>Người thực hiện</th>
+              </tr>
+            </thead>
+            <tbody id="movementTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 6: BÁO CÁO & XUẤT NHẬP EXCEL -->
       <section id="reports" class="view hidden">
         <div class="card" style="padding: 2rem;">
           <h2>Xuất & Nhập dữ liệu hàng loạt</h2>
@@ -197,7 +236,7 @@
         </div>
       </section>
 
-      <!-- TAB 6: QUẢN LÝ NGƯỜI DÙNG -->
+      <!-- TAB 7: QUẢN LÝ NGƯỜI DÙNG -->
       <section id="users" class="view hidden">
         <div class="toolbar">
           <div>
@@ -223,9 +262,9 @@
     </main>
   </div>
 
-  <!-- THANH CÔNG CỤ NỔI KHI CHỌN HÀNG LOẠT (FLOATING BULK BAR) -->
+  <!-- THANH CÔNG CỤ NỔI KHI CHỌN HÀNG LOẠT -->
   <div id="floatingBar" class="floating-bar hidden">
-    <span>Đã chọn <b id="selectedCount">0</b> thiết bị</span>
+    <span>Đã chọn <b id="selectedCount">0</b> thiết bị (theo kết quả lọc)</span>
     <div style="display:flex; gap:8px;">
       <button class="primary" onclick="openBulkMovementModal()">🔄 Điều chuyển hàng loạt</button>
       <button class="secondary" onclick="bulkDeleteDevices()" style="color:red;">🗑️ Xóa đã chọn</button>
@@ -233,7 +272,7 @@
     </div>
   </div>
 
-  <!-- MODAL ĐIỀU CHUYỂN HÀNG LOẠT -->
+  <!-- MODAL ĐIỀU CHUYỂN HÀNG LOẠT (CHỌN VỊ TRÍ CHUẨN HÓA) -->
   <div id="bulkMovementModal" class="modal hidden">
     <div class="modal-card card">
       <h3>Điều chuyển hàng loạt thiết bị</h3>
@@ -247,9 +286,9 @@
           <option value="Báo thanh lý">Đề xuất thanh lý</option>
         </select>
         <label>Vị trí chuyển đến (*)</label>
-        <input type="text" id="bulkToLocation" required placeholder="VD: Phòng Lab 2, Kho kỹ thuật...">
+        <select id="bulkToLocation" required></select>
         <label>Ghi chú / Lý do</label>
-        <input type="text" id="bulkNote" placeholder="VD: Bàn giao đợt 1...">
+        <input type="text" id="bulkNote" placeholder="VD: Di dời toàn bộ phòng máy sang khu mới...">
         <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('bulkMovementModal')">Hủy</button>
           <button type="submit" class="primary">Xác nhận điều chuyển</button>
@@ -285,8 +324,8 @@
         <input type="text" id="devSerial" placeholder="VD: FOC12345678">
         <label>Danh mục</label>
         <select id="devCategory"></select>
-        <label>Vị trí</label>
-        <input type="text" id="devLocation" placeholder="VD: Kho kỹ thuật Tầng 1">
+        <label>Vị trí / Kho lưu trữ</label>
+        <select id="devLocation"></select>
         <label>Tình trạng</label>
         <select id="devStatus">
           <option value="Trong kho">Trong kho</option>
@@ -313,14 +352,14 @@
         <select id="movDeviceCode" required onchange="handleSelectDeviceForMovement()"></select>
         <label>Loại giao dịch (*)</label>
         <select id="movType" onchange="handleMovementTypeChange()">
-          <option value="Xuất kho">Xuất kho sử dụng</option>
+          <option value="Xuất kho">Xuất kho sử dụng (Bàn giao vị trí mới)</option>
           <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Đi bảo hành</option>
           <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
           <option value="Báo thanh lý">Báo thanh lý</option>
           <option value="Điều chuyển">Điều chuyển</option>
         </select>
         <label>Vị trí chuyển đến (*)</label>
-        <input type="text" id="movToLocation" required placeholder="VD: Phòng Lab 1, Kho kỹ thuật...">
+        <select id="movToLocation" required></select>
         <label>Ghi chú / Lý do</label>
         <input type="text" id="movNote" placeholder="VD: Sét đánh nguồn, hỏng quạt...">
         <div class="modal-actions">
