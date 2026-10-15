@@ -23,6 +23,7 @@ body {
   min-height: 100vh;
 }
 
+/* KHUNG ĐĂNG NHẬP */
 .login {
   display: flex;
   justify-content: center;
@@ -35,6 +36,33 @@ body {
   width: 100%;
   max-width: 400px;
   padding: 2.5rem;
+}
+
+.login-card label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  outline: none;
+  background: #fff;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.login-card button[type="submit"] {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: 10px;
+  font-size: 1rem;
 }
 
 #app {
@@ -209,7 +237,7 @@ h2 { font-size: 1.25rem; }
 
 .filter-bar input, .filter-bar select { margin: 0; }
 
-/* BẢNG DỮ LIỆU TỰ CO GIÃN THEO KHUNG NHÌN */
+/* BẢNG THIẾT BỊ: CO GIÃN VỪA VẶN MÀN HÌNH */
 .table-card {
   overflow-x: auto;
   border-radius: var(--radius);
@@ -239,4 +267,144 @@ h2 { font-size: 1.25rem; }
   border-bottom: 1px solid var(--border);
 }
 
-.table tr:last-child td
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover td { background: #fbfcfe; }
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.badge-primary { background: #dbeafe; color: #1e40af; }
+.badge-secondary { background: #f1f5f9; color: #475569; }
+.badge-danger { background: #fee2e2; color: #991b1b; }
+
+button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 0;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+button.primary { background: var(--primary); color: #fff; }
+button.primary:hover { background: var(--primary-hover); }
+
+button.secondary { background: #f1f5f9; color: #334155; border: 1px solid var(--border); }
+button.secondary:hover { background: #e2e8f0; }
+
+.action-btn-group {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.btn-action-sm {
+  padding: 5px 9px !important;
+  font-size: 0.78rem !important;
+  border-radius: 4px !important;
+  line-height: 1.2;
+}
+
+input, select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.92rem;
+  outline: none;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+input[type="checkbox"] { width: auto; margin: 0; }
+input:focus, select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+label { display: block; font-size: 0.9rem; font-weight: 600; margin-top: 8px; }
+.muted { color: var(--text-muted); font-size: 0.88rem; }
+.hidden { display: none !important; }
+.error-msg { color: #b91c1c; background: #fee2e2; padding: 10px; border-radius: 6px; margin-top: 12px; }
+
+/* MODAL */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal.active {
+  display: flex !important;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 480px;
+  padding: 2rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 1.5rem;
+}
+
+.floating-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 50px;
+  display: none;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  max-width: calc(100vw - 24px);
+}
+
+.floating-bar.active {
+  display: flex !important;
+}
+
+.floating-bar span { font-size: 0.95rem; }
+
+@media (max-width: 900px) {
+  #app { flex-direction: column; }
+  .sidebar { width: 100%; padding: 1rem; }
+  .nav-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  main { padding: 1rem; }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filter-bar { grid-template-columns: 1fr; }
+  .floating-bar { flex-wrap: wrap; justify-content: center; border-radius: 16px; bottom: 10px; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .stat-card { padding: 1rem; }
+  .stat-card h2 { font-size: 1.5rem; }
+  .login-card { padding: 1.5rem; }
+}
