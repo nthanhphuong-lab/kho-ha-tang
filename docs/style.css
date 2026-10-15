@@ -46,3 +46,34 @@ label { display:block;font-size:.9rem;font-weight:600;margin-top:8px; } .muted {
 .floating-bar.active { display:flex!important; } .floating-bar span { font-size:.95rem; }
 @media(max-width:900px) { #app { flex-direction:column; } .sidebar { width:100%;padding:1rem; } .nav-menu { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); } main { padding:1rem; } .stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .filter-bar { grid-template-columns:1fr; } .floating-bar { flex-wrap:wrap;justify-content:center;border-radius:16px;bottom:10px; } }
 @media(max-width:480px) { .stats-grid { grid-template-columns:1fr 1fr;gap:.6rem; } .stat-card { padding:1rem; } .stat-card h2 { font-size:1.5rem; } .login-card { padding:1.5rem; } }
+/* Tự co giãn vừa vặn khung hình 100%, bỏ tràn cuộn ngang */
+.table-card {
+  overflow-x: auto;
+  border-radius: var(--radius);
+}
+
+.table {
+  width: 100% !important;
+  min-width: unset !important; /* Xoá ép độ rộng 760px */
+  table-layout: auto;
+}
+
+.table th, .table td {
+  padding: 10px 10px !important;
+  font-size: 0.88rem;
+}
+
+/* Tinh gọn các nút thao tác nhanh để không đẩy vỡ bảng */
+.action-btn-group {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.btn-action-sm {
+  padding: 6px 10px !important;
+  font-size: 0.8rem !important;
+  border-radius: 4px !important;
+  line-height: 1.2;
+}
