@@ -269,7 +269,7 @@ function renderDevices() {
         <td><b>${d.code}</b></td>
         <td>
           <div><b>${d.name || d.code}</b></div>
-          ${d.notes ? `<small class="muted" style="display:block; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${d.notes}</small>` : ''}
+          ${d.notes ? `<small class="muted" style="display:block; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${d.notes}</small>` : ''}
         </td>
         <td>${d.model || "-"}</td>
         <td><code>${d.serial || "-"}</code></td>
@@ -283,9 +283,9 @@ function renderDevices() {
         </td>
         ${isAdmin ? `
           <td style="text-align:right; white-space:nowrap;">
-            <button type="button" data-act="quick-mov" data-val="\${d.code}" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
-            <button type="button" data-act="edit-dev" data-val="\${d.code}" style="cursor:pointer; margin-right:4px;">Sửa</button>
-            <button type="button" data-act="del-dev" data-val="\${d.code}" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" data-act="quick-mov" data-val="${d.code}" style="background:#2563eb; color:#fff; cursor:pointer; margin-right:4px;">Chuyển/Báo hỏng</button>
+            <button type="button" data-act="edit-dev" data-val="${d.code}" style="cursor:pointer; margin-right:4px;">Sửa</button>
+            <button type="button" data-act="del-dev" data-val="${d.code}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -507,8 +507,8 @@ function renderLocations() {
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
-            <button type="button" data-act="rename-loc" data-val="\${loc}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
-            <button type="button" data-act="del-loc" data-val="\${loc}" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" data-act="rename-loc" data-val="${loc}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button type="button" data-act="del-loc" data-val="${loc}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -552,8 +552,8 @@ function renderCategories() {
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
-            <button type="button" data-act="rename-cat" data-val="\${cat}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
-            <button type="button" data-act="del-cat" data-val="\${cat}" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" data-act="rename-cat" data-val="${cat}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
+            <button type="button" data-act="del-cat" data-val="${cat}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
       </tr>
     `;
@@ -773,7 +773,11 @@ async function callMutate(action, payload) {
   });
 
   const data = await res.json();
-  if (!res.ok) alert(data.error || "Thao tác thất bại");
+  if (!res.ok) {
+    const message = data.error || `Thao tác thất bại (HTTP ${res.status})`;
+    alert(message);
+    throw new Error(message);
+  }
   return data;
 }
 
@@ -840,7 +844,7 @@ async function loadUsers() {
         <td><span class="badge ${u.role === 'admin' ? 'badge-primary' : 'badge-secondary'}">${u.role === 'admin' ? 'Quản trị viên' : 'Chỉ xem (Viewer)'}</span></td>
         <td style="text-align:right;">
           ${u.username.toLowerCase() !== 'admin' ? `
-            <button type="button" onclick="deleteUser('\${u.username}')" style="color:red; cursor:pointer;">Xóa</button>
+            <button type="button" onclick="deleteUser('${u.username}')" style="color:red; cursor:pointer;">Xóa</button>
           ` : '<small class="muted">Tài khoản chính</small>'}
         </td>
       </tr>
