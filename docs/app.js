@@ -2,6 +2,7 @@ let STATE = {
   devices: [],
   movements: [],
   categories: [],
+  categoryUnits: {},
   locations: [],
   currentUser: null
 };
@@ -63,6 +64,8 @@ document.addEventListener("click", (e) => {
     renameCategory(val);
   } else if (act === "del-cat") {
     deleteCategory(val);
+  } else if (act === "unit-cat") {
+    editCategoryUnit(val);
   }
 });
 
@@ -190,6 +193,7 @@ async function loadState() {
     STATE.devices = data.devices || [];
     STATE.movements = data.movements || [];
     STATE.categories = data.categories || [];
+    STATE.categoryUnits = data.categoryUnits || {};
     STATE.locations = data.locations || [
       "Kho kỹ thuật - Tầng 1",
       "Kho thiết bị dự phòng",
@@ -273,8 +277,8 @@ function renderDevices() {
         <td>${d.model || "-"}</td>
         <td><code>${d.serial || "-"}</code></td>
         <td>${d.category || ""}</td>
-        <td><b>${d.trackingMode === "quantity" && d.stockByLocation ? Object.entries(d.stockByLocation).filter(([loc,q]) => Number(q) > 0).map(([loc,q]) => `${loc}: ${Number(q).toLocaleString("vi-VN")} ${d.unit || "cái"}`).join("; ") || d.location || "-" : d.location || "-"}</b></td>
-        <td><b>${d.trackingMode === "quantity" ? Number(d.quantity || 0).toLocaleString("vi-VN") : "1"} ${d.unit || "cái"}</b></td>
+        <td><b>${d.location || "-"}</b></td>
+        <td><b>${Number(d.quantity) > 0 ? Number(d.quantity).toLocaleString("vi-VN") : "1"} ${d.unit || "cái"}</b></td>
         <td>
           <span class="badge ${
             d.status === 'Trong kho' ? 'badge-primary' : 
@@ -376,10 +380,26 @@ function markDeviceCodeManual() {
   if (el && !el.readOnly) el.dataset.manual = "true";
 }
 
+function defaultUnitForCategory(category) {
+  const cat = String(category || "").toLowerCase();
+  if (/cáp|cap|dây điện|dây mạng|dây quang|dây dẫn/i.test(cat)) return "mét";
+  if (/dây nhảy|patch.?cord|jumper/i.test(cat)) return "sợi";
+  if (/odf|switch|router|firewall|camera|máy tính|laptop|máy in|ups|lưu điện|server|máy chủ|hộp phối quang|thiết bị|đầu nối|connector|adapter|vật tư/i.test(cat)) return "cái";
+  return "cái";
+}
+
+function unitForCategory(category) {
+  const key = String(category || "").trim();
+  return String(STATE.categoryUnits?.[key] || defaultUnitForCategory(key));
+}
+
 function handleDeviceCategoryChange() {
   const codeEl = document.getElementById("devCode");
   if (codeEl && (!codeEl.value.trim() || codeEl.dataset.manual !== "true")) suggestDeviceCode(false);
-  const cat = String(document.getElementById("devCategory")?.value || "").toLowerCase();
+  const selectedCategory = String(document.getElementById("devCategory")?.value || "");
+  const unitEl = document.getElementById("devUnit");
+  if (unitEl && selectedCategory) unitEl.value = unitForCategory(selectedCategory);
+  const cat = selectedCategory.toLowerCase();
   const mode = /cáp|cap|dây nhảy|patchcord|vật tư|dây điện|đầu nối|hộp phối quang/i.test(cat) ? "quantity" : "individual";
   const modeEl = document.getElementById("devTrackingMode");
   if (modeEl && !document.getElementById("devCode")?.readOnly) modeEl.value = mode;
@@ -493,30 +513,14 @@ function openMovementModal(deviceCode = null) {
     const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
     if (dev) {
       setElementValueSafe("movDeviceCode", dev.code, true);
-      setElementValueSafe("movFromLocation", dev.location || STATE.locations[0] || "", true);
-      setElementValueSafe("movToLocation", dev.location || STATE.locations[0] || "", true);
+      setElementValueSafe("movToLocation", dev.location || "", true);
     }
   }
 
-  handleSelectDeviceForMovement();
+  handleMovementTypeChange();
 }
 
 function handleSelectDeviceForMovement() {
-  const code = document.getElementById("movDeviceCode")?.value;
-  const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(code).toLowerCase());
-  const from = document.getElementById("movFromLocation");
-  if (from && dev?.trackingMode === "quantity" && dev.stockByLocation) {
-    const locs = Object.entries(dev.stockByLocation).filter(([loc,q]) => Number(q) > 0).map(([loc]) => loc);
-    from.innerHTML = (locs.length ? locs : STATE.locations).map(l => `<option value="${l}">${l}</option>`).join("");
-  } else if (from) {
-    from.innerHTML = STATE.locations.map(l => `<option value="${l}">${l}</option>`).join("");
-  }
-  if (dev) {
-    const preferred = dev.trackingMode === "quantity" && dev.stockByLocation
-      ? (Object.entries(dev.stockByLocation).find(([loc, q]) => Number(q) > 0)?.[0] || dev.location)
-      : dev.location;
-    setElementValueSafe("movFromLocation", preferred || STATE.locations[0] || "", true);
-  }
   handleMovementTypeChange();
 }
 
@@ -527,22 +531,6 @@ function handleMovementTypeChange() {
   const devCode = document.getElementById("movDeviceCode")?.value;
   const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(devCode).toLowerCase());
   const noteInput = document.getElementById("movNote");
-  const fromSelect = document.getElementById("movFromLocation");
-  const qtyWrap = document.getElementById("movQuantityWrap");
-  const qtyInput = document.getElementById("movQuantity");
-  const qtyHelp = document.getElementById("movAvailableQty");
-  if (dev?.trackingMode === "quantity") {
-    const map = dev.stockByLocation || { [dev.location || "Kho kỹ thuật"]: Number(dev.quantity || 0) };
-    const source = fromSelect?.value || dev.location;
-    const available = Number(map[source] || 0);
-    if (qtyWrap) qtyWrap.style.display = "block";
-    if (qtyInput) { qtyInput.max = String(available); if (!qtyInput.value || Number(qtyInput.value) > available) qtyInput.value = available; }
-    if (qtyHelp) qtyHelp.textContent = `Tồn tại vị trí này: ${available.toLocaleString("vi-VN")} ${dev.unit || "cái"}`;
-  } else {
-    if (qtyWrap) qtyWrap.style.display = "none";
-    if (qtyInput) qtyInput.value = "1";
-    if (qtyHelp) qtyHelp.textContent = "";
-  }
 
   if (type === "Báo hỏng / Đi bảo hành") {
     const loc = STATE.locations.find(l => l.includes("Kho")) || STATE.locations[0] || "Kho kỹ thuật";
@@ -567,11 +555,8 @@ async function handleSaveMovement(e) {
   const deviceCode = document.getElementById("movDeviceCode")?.value;
   const type = document.getElementById("movType")?.value;
   const toLocation = document.getElementById("movToLocation")?.value;
-  const fromLocation = document.getElementById("movFromLocation")?.value;
-  const quantity = Number(document.getElementById("movQuantity")?.value || 1);
   const note = (document.getElementById("movNote")?.value || "").trim();
   const dev = STATE.devices.find(d => d.code === deviceCode);
-  if (dev?.trackingMode === "quantity" && (!Number.isFinite(quantity) || quantity <= 0)) return alert("Vui lòng nhập số lượng lớn hơn 0.");
 
   let newStatus = "Đang sử dụng";
   if (type === "Báo hỏng / Đi bảo hành") newStatus = "Hỏng / Bảo hành";
@@ -581,10 +566,9 @@ async function handleSaveMovement(e) {
   await callMutate("movement.create", {
     deviceCode,
     type,
-    fromLocation: fromLocation || (dev ? dev.location : ""),
+    fromLocation: dev ? dev.location : "",
     toLocation,
     status: newStatus,
-    quantity,
     note
   });
 
@@ -599,7 +583,7 @@ function renderMovements() {
     <tr>
       <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
       <td><b>${m.deviceCode}</b></td>
-      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span>${Number(m.quantity) > 0 ? `<small style="display:block;">SL: ${Number(m.quantity).toLocaleString("vi-VN")} ${m.unit || "cái"}</small>` : ""}</td>
+      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span></td>
       <td>${m.fromLocation || "-"}</td>
       <td><b>${m.toLocation || "-"}</b></td>
       <td><small>${m.note || "-"}</small></td>
@@ -667,9 +651,11 @@ function renderCategories() {
       <tr>
         <td>${idx + 1}</td>
         <td><b>${cat}</b></td>
+        <td><b>${unitForCategory(cat)}</b></td>
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
+            <button type="button" data-act="unit-cat" data-val="${cat}" style="cursor:pointer; margin-right:5px;">Đổi đơn vị</button>
             <button type="button" data-act="rename-cat" data-val="${cat}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
             <button type="button" data-act="del-cat" data-val="${cat}" style="color:red; cursor:pointer;">Xóa</button>
           </td>` : `<td></td>`}
@@ -681,7 +667,18 @@ function renderCategories() {
 async function openAddCategoryModal() {
   const name = prompt("Nhập tên danh mục mới:");
   if (!name || !name.trim()) return;
-  await callMutate("category.add", { name: name.trim() });
+  const unit = prompt("Đơn vị tính mặc định cho danh mục này:", defaultUnitForCategory(name.trim()));
+  if (!unit || !unit.trim()) return;
+  await callMutate("category.add", { name: name.trim(), unit: unit.trim() });
+  await loadState();
+}
+
+async function editCategoryUnit(category) {
+  const current = unitForCategory(category);
+  const unit = prompt(`Đơn vị tính mặc định của danh mục "${category}":`, current);
+  if (!unit || !unit.trim()) return;
+  const result = await callMutate("category.unit.update", { name: category, unit: unit.trim() });
+  if (result && result.error) return;
   await loadState();
 }
 
@@ -713,8 +710,6 @@ function populateSelects() {
 
   const movLoc = document.getElementById("movToLocation");
   if (movLoc && movLoc.tagName === "SELECT") movLoc.innerHTML = locOptions;
-  const movFromLoc = document.getElementById("movFromLocation");
-  if (movFromLoc && movFromLoc.tagName === "SELECT") movFromLoc.innerHTML = locOptions;
 
   const bulkLoc = document.getElementById("bulkToLocation");
   if (bulkLoc && bulkLoc.tagName === "SELECT") bulkLoc.innerHTML = locOptions;
