@@ -100,6 +100,18 @@
             <h2 id="statFaulty">0</h2>
           </div>
         </div>
+
+        <div class="card" style="margin-top:16px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div>
+              <h3 style="margin:0 0 5px;">📍 Tồn kho theo vị trí</h3>
+              <div class="muted">Chọn một kho/vị trí để xem danh sách tài sản và vật tư đang được ghi nhận tại đó.</div>
+            </div>
+            <button class="secondary" onclick="showView('locations')">Quản lý vị trí</button>
+          </div>
+          <div id="dashboardLocations" class="stats-grid" style="margin-top:14px;"></div>
+        </div>
+        <div id="dashboardLocationDetail" class="card hidden" style="margin-top:12px; padding:16px;"></div>
       </section>
 
       <!-- TAB 2: DANH SÁCH THIẾT BỊ -->
