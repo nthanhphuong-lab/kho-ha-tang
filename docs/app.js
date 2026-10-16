@@ -110,7 +110,7 @@ function showView(viewId) {
 
   const titles = {
     dashboard: "Tổng quan",
-    devices: "Danh sách thiết bị",
+    devices: "Danh sách tài sản & vật tư",
     locations: "Danh bạ Vị trí & Kho",
     categories: "Danh mục thiết bị",
     movements: "Lịch sử điều chuyển & sự cố",
@@ -212,15 +212,14 @@ async function loadState() {
 
 function renderDashboard() {
   const total = document.getElementById("statTotalDevices");
-  if (total) total.innerText = STATE.devices.length;
+  const qtyOf = d => Number.isFinite(Number(d.quantity)) && d.quantity !== "" ? Number(d.quantity) : 1;
+  if (total) total.innerText = STATE.devices.reduce((sum, d) => sum + qtyOf(d), 0).toLocaleString("vi-VN");
   const inStock = document.getElementById("statInStock");
-  if (inStock) inStock.innerText = STATE.devices.filter(d => d.status === "Trong kho").length;
+  if (inStock) inStock.innerText = STATE.devices.filter(d => d.status === "Trong kho").reduce((sum, d) => sum + qtyOf(d), 0).toLocaleString("vi-VN");
   const inUse = document.getElementById("statInUse");
-  if (inUse) inUse.innerText = STATE.devices.filter(d => d.status === "Đang sử dụng").length;
+  if (inUse) inUse.innerText = STATE.devices.filter(d => d.status === "Đang sử dụng").reduce((sum, d) => sum + qtyOf(d), 0).toLocaleString("vi-VN");
   const faulty = document.getElementById("statFaulty");
-  if (faulty) faulty.innerText = STATE.devices.filter(d => 
-    (d.status || "").includes("Hỏng") || (d.status || "").includes("Thanh lý")
-  ).length;
+  if (faulty) faulty.innerText = STATE.devices.filter(d => (d.status || "").includes("Hỏng") || (d.status || "").includes("Thanh lý")).reduce((sum, d) => sum + qtyOf(d), 0).toLocaleString("vi-VN");
 }
 
 // BỘ LỌC ĐA NĂNG
@@ -274,7 +273,8 @@ function renderDevices() {
         <td>${d.model || "-"}</td>
         <td><code>${d.serial || "-"}</code></td>
         <td>${d.category || ""}</td>
-        <td><b>${d.location || "-"}</b></td>
+        <td><b>${d.trackingMode === "quantity" && d.stockByLocation ? Object.entries(d.stockByLocation).filter(([loc,q]) => Number(q) > 0).map(([loc,q]) => `${loc}: ${Number(q).toLocaleString("vi-VN")} ${d.unit || "cái"}`).join("; ") || d.location || "-" : d.location || "-"}</b></td>
+        <td><b>${d.trackingMode === "quantity" ? Number(d.quantity || 0).toLocaleString("vi-VN") : "1"} ${d.unit || "cái"}</b></td>
         <td>
           <span class="badge ${
             d.status === 'Trong kho' ? 'badge-primary' : 
@@ -334,46 +334,121 @@ function updateFloatingBar() {
 // ----------------------------------------------------
 // THAO TÁC THIẾT BỊ
 // ----------------------------------------------------
+function categoryPrefix(category) {
+  const name = String(category || "TS").trim();
+  const known = [
+    [/cáp|cap/i, "CAP"], [/dây nhảy|patchcord/i, "DNQ"], [/odf/i, "ODF"],
+    [/switch|thiết bị mạng/i, "SW"], [/router/i, "RTR"], [/firewall/i, "FW"],
+    [/camera/i, "CAM"], [/máy tính|laptop|computer/i, "MT"], [/máy in|printer/i, "MPR"],
+    [/ups|lưu điện/i, "UPS"], [/server|máy chủ/i, "SRV"], [/hộp phối quang/i, "HPQ"],
+    [/vật tư/i, "VT"]
+  ];
+  const hit = known.find(([re]) => re.test(name));
+  if (hit) return hit[1];
+  const words = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toUpperCase().match(/[A-Z0-9]+/g) || ["TS"];
+  return words.length > 1 ? words.slice(0, 3).map(w => w[0]).join("") : words[0].slice(0, 4);
+}
+
+function suggestDeviceCode(force = false) {
+  const codeEl = document.getElementById("devCode");
+  const category = document.getElementById("devCategory")?.value || "";
+  if (!codeEl || codeEl.readOnly) return;
+  if (!force && codeEl.value.trim() && codeEl.dataset.manual === "true") return;
+  const prefix = categoryPrefix(category);
+  const re = new RegExp("^" + prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "-(\\d+)$", "i");
+  let max = 0;
+  STATE.devices.forEach(d => {
+    const m = String(d.code || "").match(re);
+    if (m) max = Math.max(max, Number(m[1]));
+  });
+  let next = max + 1;
+  let candidate = `${prefix}-${String(next).padStart(4, "0")}`;
+  while (STATE.devices.some(d => String(d.code).toLowerCase() === candidate.toLowerCase())) {
+    next++;
+    candidate = `${prefix}-${String(next).padStart(4, "0")}`;
+  }
+  codeEl.value = candidate;
+  codeEl.dataset.manual = force ? "false" : "auto";
+}
+
+function markDeviceCodeManual() {
+  const el = document.getElementById("devCode");
+  if (el && !el.readOnly) el.dataset.manual = "true";
+}
+
+function handleDeviceCategoryChange() {
+  const codeEl = document.getElementById("devCode");
+  if (codeEl && (!codeEl.value.trim() || codeEl.dataset.manual !== "true")) suggestDeviceCode(false);
+  const cat = String(document.getElementById("devCategory")?.value || "").toLowerCase();
+  const mode = /cáp|cap|dây nhảy|patchcord|vật tư|dây điện|đầu nối|hộp phối quang/i.test(cat) ? "quantity" : "individual";
+  const modeEl = document.getElementById("devTrackingMode");
+  if (modeEl && !document.getElementById("devCode")?.readOnly) modeEl.value = mode;
+  handleTrackingModeChange();
+}
+
+function handleTrackingModeChange() {
+  const mode = document.getElementById("devTrackingMode")?.value || "individual";
+  const serialWrap = document.getElementById("devSerialWrap");
+  const qtyWrap = document.getElementById("devQuantityWrap");
+  const qty = document.getElementById("devQuantity");
+  const unit = document.getElementById("devUnit");
+  if (serialWrap) serialWrap.style.display = mode === "individual" ? "block" : "none";
+  if (qtyWrap) qtyWrap.style.display = "grid";
+  if (qty) {
+    qty.required = true;
+    if (mode === "individual") { qty.value = "1"; qty.readOnly = true; }
+    else qty.readOnly = false;
+  }
+  if (unit && mode === "individual" && !unit.value) unit.value = "cái";
+}
+
 function openDeviceModal(deviceCode = null) {
   populateSelects();
   showModalById("deviceModal");
-
   const titleEl = document.getElementById("deviceModalTitle");
   const codeEl = document.getElementById("devCode");
-
   if (deviceCode) {
     const clean = String(deviceCode).trim().toLowerCase();
     const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
     if (dev) {
-      if (titleEl) titleEl.innerText = "Chỉnh sửa hồ sơ thiết bị";
-      if (codeEl) {
-        codeEl.value = dev.code || "";
-        codeEl.readOnly = true;
-      }
+      if (titleEl) titleEl.innerText = "Chỉnh sửa tài sản / vật tư";
+      codeEl.value = dev.code || "";
+      codeEl.readOnly = true;
+      codeEl.dataset.manual = "true";
       setElementValueSafe("devName", dev.name || "");
       setElementValueSafe("devModel", dev.model || "");
       setElementValueSafe("devSerial", dev.serial || "");
       setElementValueSafe("devCategory", dev.category || "", true);
       setElementValueSafe("devLocation", dev.location || "", true);
       setElementValueSafe("devStatus", dev.status || "Trong kho", true);
+      setElementValueSafe("devTrackingMode", dev.trackingMode || (dev.quantity > 1 && !dev.serial ? "quantity" : "individual"), true);
+      setElementValueSafe("devQuantity", dev.quantity ?? 1);
+      setElementValueSafe("devUnit", dev.unit || "cái");
       setElementValueSafe("devNotes", dev.notes || "");
+      handleTrackingModeChange();
       return;
     }
   }
-
-  // Chế độ Thêm mới
-  if (titleEl) titleEl.innerText = "Thêm thiết bị mới";
-  if (codeEl) {
-    codeEl.value = "";
-    codeEl.readOnly = false;
-  }
+  if (titleEl) titleEl.innerText = "Thêm tài sản / vật tư";
+  codeEl.value = "";
+  codeEl.readOnly = false;
+  codeEl.dataset.manual = "false";
   setElementValueSafe("devName", "");
   setElementValueSafe("devModel", "");
   setElementValueSafe("devSerial", "");
   setElementValueSafe("devCategory", STATE.categories[0] || "", true);
   setElementValueSafe("devLocation", STATE.locations[0] || "", true);
   setElementValueSafe("devStatus", "Trong kho", true);
+  setElementValueSafe("devTrackingMode", "individual", true);
+  setElementValueSafe("devQuantity", "1");
+  setElementValueSafe("devUnit", "cái");
   setElementValueSafe("devNotes", "");
+  handleDeviceCategoryChange();
+}
+
+function scanForDeviceSerial() {
+  window._scanTarget = "serial";
+  openScannerModal();
 }
 
 function deleteDeviceByCode(code) {
@@ -390,13 +465,20 @@ async function handleSaveDevice(e) {
   const category = document.getElementById("devCategory")?.value || "";
   const location = document.getElementById("devLocation")?.value || "";
   const status = document.getElementById("devStatus")?.value || "Trong kho";
+  const trackingMode = document.getElementById("devTrackingMode")?.value || "individual";
+  const quantity = trackingMode === "individual" ? 1 : Number(document.getElementById("devQuantity")?.value || 0);
+  const unit = (document.getElementById("devUnit")?.value || "cái").trim() || "cái";
   const notes = (document.getElementById("devNotes")?.value || "").trim();
   const isEdit = document.getElementById("devCode")?.readOnly;
-
+  if (!code || !name || !category) return alert("Vui lòng nhập mã, tên và chọn danh mục.");
+  if (!isEdit && STATE.devices.some(d => String(d.code).toLowerCase() === code.toLowerCase())) return alert("Mã quản lý đã tồn tại. Hãy tạo mã khác.");
+  if (trackingMode === "quantity" && (!Number.isFinite(quantity) || quantity <= 0)) return alert("Số lượng phải lớn hơn 0.");
+  if (trackingMode === "individual" && quantity !== 1) return alert("Tài sản quản lý từng chiếc phải có số lượng bằng 1. Muốn nhập nhiều, hãy chọn quản lý theo số lượng.");
   const action = isEdit ? "device.update" : "device.add";
-  await callMutate(action, { code, name, model, serial, category, location, status, notes });
+  const result = await callMutate(action, { code, name, model, serial: trackingMode === "individual" ? serial : "", category, location, status, notes, trackingMode, quantity, unit });
+  if (result && result.error) return;
   closeModal("deviceModal");
-  loadState();
+  await loadState();
 }
 
 // ----------------------------------------------------
@@ -411,14 +493,30 @@ function openMovementModal(deviceCode = null) {
     const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
     if (dev) {
       setElementValueSafe("movDeviceCode", dev.code, true);
-      setElementValueSafe("movToLocation", dev.location || "", true);
+      setElementValueSafe("movFromLocation", dev.location || STATE.locations[0] || "", true);
+      setElementValueSafe("movToLocation", dev.location || STATE.locations[0] || "", true);
     }
   }
 
-  handleMovementTypeChange();
+  handleSelectDeviceForMovement();
 }
 
 function handleSelectDeviceForMovement() {
+  const code = document.getElementById("movDeviceCode")?.value;
+  const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(code).toLowerCase());
+  const from = document.getElementById("movFromLocation");
+  if (from && dev?.trackingMode === "quantity" && dev.stockByLocation) {
+    const locs = Object.entries(dev.stockByLocation).filter(([loc,q]) => Number(q) > 0).map(([loc]) => loc);
+    from.innerHTML = (locs.length ? locs : STATE.locations).map(l => `<option value="${l}">${l}</option>`).join("");
+  } else if (from) {
+    from.innerHTML = STATE.locations.map(l => `<option value="${l}">${l}</option>`).join("");
+  }
+  if (dev) {
+    const preferred = dev.trackingMode === "quantity" && dev.stockByLocation
+      ? (Object.entries(dev.stockByLocation).find(([loc, q]) => Number(q) > 0)?.[0] || dev.location)
+      : dev.location;
+    setElementValueSafe("movFromLocation", preferred || STATE.locations[0] || "", true);
+  }
   handleMovementTypeChange();
 }
 
@@ -429,6 +527,22 @@ function handleMovementTypeChange() {
   const devCode = document.getElementById("movDeviceCode")?.value;
   const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(devCode).toLowerCase());
   const noteInput = document.getElementById("movNote");
+  const fromSelect = document.getElementById("movFromLocation");
+  const qtyWrap = document.getElementById("movQuantityWrap");
+  const qtyInput = document.getElementById("movQuantity");
+  const qtyHelp = document.getElementById("movAvailableQty");
+  if (dev?.trackingMode === "quantity") {
+    const map = dev.stockByLocation || { [dev.location || "Kho kỹ thuật"]: Number(dev.quantity || 0) };
+    const source = fromSelect?.value || dev.location;
+    const available = Number(map[source] || 0);
+    if (qtyWrap) qtyWrap.style.display = "block";
+    if (qtyInput) { qtyInput.max = String(available); if (!qtyInput.value || Number(qtyInput.value) > available) qtyInput.value = available; }
+    if (qtyHelp) qtyHelp.textContent = `Tồn tại vị trí này: ${available.toLocaleString("vi-VN")} ${dev.unit || "cái"}`;
+  } else {
+    if (qtyWrap) qtyWrap.style.display = "none";
+    if (qtyInput) qtyInput.value = "1";
+    if (qtyHelp) qtyHelp.textContent = "";
+  }
 
   if (type === "Báo hỏng / Đi bảo hành") {
     const loc = STATE.locations.find(l => l.includes("Kho")) || STATE.locations[0] || "Kho kỹ thuật";
@@ -453,8 +567,11 @@ async function handleSaveMovement(e) {
   const deviceCode = document.getElementById("movDeviceCode")?.value;
   const type = document.getElementById("movType")?.value;
   const toLocation = document.getElementById("movToLocation")?.value;
+  const fromLocation = document.getElementById("movFromLocation")?.value;
+  const quantity = Number(document.getElementById("movQuantity")?.value || 1);
   const note = (document.getElementById("movNote")?.value || "").trim();
   const dev = STATE.devices.find(d => d.code === deviceCode);
+  if (dev?.trackingMode === "quantity" && (!Number.isFinite(quantity) || quantity <= 0)) return alert("Vui lòng nhập số lượng lớn hơn 0.");
 
   let newStatus = "Đang sử dụng";
   if (type === "Báo hỏng / Đi bảo hành") newStatus = "Hỏng / Bảo hành";
@@ -464,9 +581,10 @@ async function handleSaveMovement(e) {
   await callMutate("movement.create", {
     deviceCode,
     type,
-    fromLocation: dev ? dev.location : "",
+    fromLocation: fromLocation || (dev ? dev.location : ""),
     toLocation,
     status: newStatus,
+    quantity,
     note
   });
 
@@ -481,7 +599,7 @@ function renderMovements() {
     <tr>
       <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
       <td><b>${m.deviceCode}</b></td>
-      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span></td>
+      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span>${Number(m.quantity) > 0 ? `<small style="display:block;">SL: ${Number(m.quantity).toLocaleString("vi-VN")} ${m.unit || "cái"}</small>` : ""}</td>
       <td>${m.fromLocation || "-"}</td>
       <td><b>${m.toLocation || "-"}</b></td>
       <td><small>${m.note || "-"}</small></td>
@@ -499,7 +617,7 @@ function renderLocations() {
   const isAdmin = STATE.currentUser?.role === "admin";
 
   tbody.innerHTML = STATE.locations.map((loc, idx) => {
-    const count = STATE.devices.filter(d => String(d.location).trim().toLowerCase() === String(loc).trim().toLowerCase()).length;
+    const count = STATE.devices.filter(d => String(d.location).trim().toLowerCase() === String(loc).trim().toLowerCase()).reduce((sum, d) => sum + (Number(d.quantity) || 1), 0);
     return `
       <tr>
         <td>${idx + 1}</td>
@@ -544,7 +662,7 @@ function renderCategories() {
   const isAdmin = STATE.currentUser?.role === "admin";
 
   tbody.innerHTML = STATE.categories.map((cat, idx) => {
-    const count = STATE.devices.filter(d => String(d.category).trim().toLowerCase() === String(cat).trim().toLowerCase()).length;
+    const count = STATE.devices.filter(d => String(d.category).trim().toLowerCase() === String(cat).trim().toLowerCase()).reduce((sum, d) => sum + (Number(d.quantity) || 1), 0);
     return `
       <tr>
         <td>${idx + 1}</td>
@@ -595,6 +713,8 @@ function populateSelects() {
 
   const movLoc = document.getElementById("movToLocation");
   if (movLoc && movLoc.tagName === "SELECT") movLoc.innerHTML = locOptions;
+  const movFromLoc = document.getElementById("movFromLocation");
+  if (movFromLoc && movFromLoc.tagName === "SELECT") movFromLoc.innerHTML = locOptions;
 
   const bulkLoc = document.getElementById("bulkToLocation");
   if (bulkLoc && bulkLoc.tagName === "SELECT") bulkLoc.innerHTML = locOptions;
@@ -687,7 +807,10 @@ async function parseAndImportCSV(csvText) {
         category: cols[4] || (STATE.categories[0] || "Khác"),
         location: cols[5] || (STATE.locations[0] || "Kho kỹ thuật"),
         status: cols[6] || "Trong kho",
-        notes: cols[7] || ""
+        notes: cols[7] || "",
+        trackingMode: cols[8] || (cols[3] ? "individual" : "quantity"),
+        quantity: Number(cols[9] || 1),
+        unit: cols[10] || "cái"
       });
     }
   }
@@ -704,7 +827,7 @@ async function parseAndImportCSV(csvText) {
 }
 
 function downloadSampleCSV() {
-  const sample = "\uFEFFMã thiết bị,Tên thiết bị,Model/Hãng,Serial/MAC,Danh mục,Vị trí,Tình trạng,Ghi chú\nSW-TEST-01,Switch 24p Cisco,WS-C2960,FOC111222,Switch mạng,Kho kỹ thuật - Tầng 1,Trong kho,Nhập đợt 1\nAP-TEST-02,Access Point Ruijie,RG-AP720-L,RUIJIE8889,Access Point Wi-Fi,Tòa nhà B - Phòng Lab 1,Đang sử dụng,Lắp trần";
+  const sample = "\uFEFFMã quản lý,Tên tài sản/vật tư,Hãng/Model/Quy cách,Serial/MAC,Danh mục,Vị trí,Tình trạng,Ghi chú,Cách quản lý,Số lượng,Đơn vị\nSW-0001,Switch 24 port,Cisco C9200,FOC111222,Switch mạng,Kho kỹ thuật,Trong kho,Thiết bị mẫu,individual,1,cái\nCAP-0001,Cáp mạng Cat6,Cat6 ngoài trời,,Cáp mạng,Kho vật tư,Trong kho,Cuộn 1000m,quantity,1000,mét\nDNQ-0001,Dây nhảy quang LC-FC,Single mode,,Dây nhảy quang,Kho vật tư,Trong kho,Đầu LC - FC,quantity,100,sợi";
   const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -724,7 +847,14 @@ function openScannerModal() {
     { fps: 10, qrbox: 250 },
     (decodedText) => {
       closeScannerModal();
-      handleScannedResult(decodedText.trim());
+      const decoded = decodedText.trim();
+      if (window._scanTarget === "serial") {
+        const serialInput = document.getElementById("devSerial");
+        if (serialInput) serialInput.value = decoded;
+        window._scanTarget = null;
+        return;
+      }
+      handleScannedResult(decoded);
     },
     () => {}
   ).catch(err => {
@@ -811,7 +941,7 @@ function exportDevicesCSV() {
   const headers = ["Mã thiết bị", "Tên thiết bị", "Model/Hãng", "Serial/MAC", "Danh mục", "Vị trí", "Tình trạng", "Lịch sử & Ghi chú"];
   const rows = [headers];
   STATE.devices.forEach(d => {
-    rows.push([d.code, d.name, d.model || "", d.serial || "", d.category, d.location || "", d.status, d.notes || ""]);
+    rows.push([d.code, d.name, d.model || "", d.serial || "", d.category, d.location || "", d.status, d.notes || "", d.trackingMode || "individual", d.quantity ?? 1, d.unit || "cái"]);
   });
   downloadCSV(`danh_sach_thiet_bi_${new Date().toISOString().slice(0,10)}.csv`, rows);
 }
