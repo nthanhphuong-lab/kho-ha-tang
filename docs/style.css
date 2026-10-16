@@ -69,24 +69,16 @@ label { display:block;font-size:.9rem;font-weight:600;margin-top:8px; } .muted {
 #devices .table th {
   line-height: 1.25;
 }
-#devices .table th:nth-child(1),
-#devices .table td:nth-child(1) { width: 4%; }
-#devices .table th:nth-child(2),
-#devices .table td:nth-child(2) { width: 8%; }
-#devices .table th:nth-child(3),
-#devices .table td:nth-child(3) { width: 16%; }
-#devices .table th:nth-child(4),
-#devices .table td:nth-child(4) { width: 10%; }
-#devices .table th:nth-child(5),
-#devices .table td:nth-child(5) { width: 11%; }
-#devices .table th:nth-child(6),
-#devices .table td:nth-child(6) { width: 10%; }
-#devices .table th:nth-child(7),
-#devices .table td:nth-child(7) { width: 11%; }
-#devices .table th:nth-child(8),
-#devices .table td:nth-child(8) { width: 10%; }
-#devices .table th:nth-child(9),
-#devices .table td:nth-child(9) { width: 20%; }
+#devices .table th:nth-child(1), #devices .table td:nth-child(1) { width: 4%; }
+#devices .table th:nth-child(2), #devices .table td:nth-child(2) { width: 8%; }
+#devices .table th:nth-child(3), #devices .table td:nth-child(3) { width: 15%; }
+#devices .table th:nth-child(4), #devices .table td:nth-child(4) { width: 9%; }
+#devices .table th:nth-child(5), #devices .table td:nth-child(5) { width: 10%; }
+#devices .table th:nth-child(6), #devices .table td:nth-child(6) { width: 10%; }
+#devices .table th:nth-child(7), #devices .table td:nth-child(7) { width: 10%; }
+#devices .table th:nth-child(8), #devices .table td:nth-child(8) { width: 7%; }
+#devices .table th:nth-child(9), #devices .table td:nth-child(9) { width: 9%; }
+#devices .table th:nth-child(10), #devices .table td:nth-child(10) { width: 18%; }
 #devices .table td code {
   white-space: normal;
   overflow-wrap: anywhere;
@@ -145,4 +137,25 @@ label { display:block;font-size:.9rem;font-weight:600;margin-top:8px; } .muted {
     padding: 6px 9px;
     font-size: .75rem;
   }
+}
+
+/* Form nhập nhanh cho hệ thống tài sản/vật tư tổng quát */
+.code-entry-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; }
+.code-entry-row input { min-width:0; }
+.code-entry-row button { margin:4px 0 12px; }
+.quantity-entry-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(110px,.7fr); gap:12px; align-items:start; }
+.quantity-entry-row input { min-width:0; }
+#deviceModal .modal-card { max-width:560px; }
+#deviceModal label { margin-top:6px; }
+#devCode { font-weight:600; letter-spacing:.02em; }
+#devQuantity[readonly] { background:#f1f5f9; color:#64748b; }
+@media(max-width:600px) {
+  #deviceModal { padding:8px; align-items:flex-end; }
+  #deviceModal .modal-card { max-height:94dvh; padding:16px; border-radius:16px 16px 8px 8px; overflow-y:auto; }
+  #deviceModal h3 { font-size:1.1rem; margin-bottom:8px; }
+  #deviceModal input, #deviceModal select { font-size:16px; padding:11px 10px; }
+  .quantity-entry-row { grid-template-columns:minmax(0,1fr) minmax(100px,.65fr); gap:8px; }
+  .code-entry-row { grid-template-columns:minmax(0,1fr) auto; gap:6px; }
+  .code-entry-row button { padding:9px 10px; font-size:.82rem; }
+  #deviceModal .modal-actions { position:sticky; bottom:-16px; background:#fff; padding:12px 0 4px; }
 }
