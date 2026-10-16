@@ -110,8 +110,39 @@ label { display:block;font-size:.9rem;font-weight:600;margin-top:8px; } .muted {
   #devices .table td { padding: 6px 4px; font-size: .72rem; }
   #devices .table td button { font-size: .65rem; padding: 4px; }
 }
+/* Điện thoại: giữ chữ theo chiều ngang, cho phép vuốt ngang riêng bảng thiết bị.
+   Ép 9 cột vào màn hình hẹp sẽ làm chữ bị bẻ từng ký tự thành hàng dọc. */
 @media (max-width: 600px) {
+  #devices .table-card {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  #devices .table {
+    min-width: 900px;
+    table-layout: auto;
+  }
   #devices .table th,
-  #devices .table td { padding: 5px 3px; font-size: .66rem; }
-  #devices .table td button { display: block; width: 100%; margin: 2px 0 !important; font-size: .64rem; }
+  #devices .table td {
+    padding: 8px 10px;
+    font-size: .8rem;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    vertical-align: middle;
+  }
+  #devices .table td code,
+  #devices .table td .badge {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  #devices .table td button {
+    display: inline-block;
+    width: auto;
+    white-space: nowrap;
+    margin: 2px !important;
+    padding: 6px 9px;
+    font-size: .75rem;
+  }
 }
