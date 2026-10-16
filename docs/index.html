@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kho Hạ Tầng CNTT</title>
+  <title>Quản lý tài sản & vật tư</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
@@ -13,9 +13,9 @@
   <div id="login" class="login">
     <div class="card login-card">
       <div class="logo">K</div>
-      <p class="eyebrow">QUẢN TRỊ TÀI SẢN CNTT</p>
-      <h2>Kho Hạ Tầng</h2>
-      <p class="muted">Đăng nhập để xem và quản lý thiết bị hạ tầng</p>
+      <p class="eyebrow">QUẢN TRỊ TÀI SẢN & VẬT TƯ</p>
+      <h2>Kho tài sản & vật tư</h2>
+      <p class="muted">Đăng nhập để quản lý tài sản, thiết bị và vật tư</p>
       <form id="loginForm" onsubmit="handleLogin(event)">
         <label>Tên đăng nhập</label>
         <input type="text" id="username" required placeholder="admin hoặc user01">
@@ -33,7 +33,7 @@
       <div class="brand">
         <div class="logo">K</div>
         <div>
-          <b>Kho Hạ Tầng</b>
+          <b>Kho tài sản & vật tư</b>
           <small id="userRoleBadge" class="muted">Quản trị viên</small>
         </div>
       </div>
@@ -69,7 +69,7 @@
     <main>
       <header>
         <div>
-          <p class="eyebrow">HỆ THỐNG QUẢN LÝ KHO</p>
+          <p class="eyebrow">HỆ THỐNG QUẢN LÝ TÀI SẢN & VẬT TƯ</p>
           <h1 id="pageTitle">Tổng quan</h1>
         </div>
         <div style="display:flex; gap:10px; align-items:center;">
@@ -84,11 +84,11 @@
       <section id="dashboard" class="view">
         <div class="stats-grid">
           <div class="card stat-card">
-            <span class="muted">Tổng thiết bị</span>
+            <span class="muted">Tổng số lượng tồn</span>
             <h2 id="statTotalDevices">0</h2>
           </div>
           <div class="card stat-card">
-            <span class="muted">Trong kho</span>
+            <span class="muted">Đang trong kho</span>
             <h2 id="statInStock">0</h2>
           </div>
           <div class="card stat-card">
@@ -106,7 +106,7 @@
       <section id="devices" class="view hidden">
         <div class="toolbar-stacked">
           <div class="filter-bar">
-            <input type="text" id="deviceSearch" placeholder="🔍 Tìm theo mã, tên, serial..." oninput="renderDevices()">
+            <input type="text" id="deviceSearch" placeholder="🔍 Tìm mã, tên, sê-ri, danh mục..." oninput="renderDevices()">
             <select id="filterCategory" onchange="renderDevices()">
               <option value="">-- Tất cả danh mục --</option>
             </select>
@@ -138,6 +138,7 @@
                 <th>Serial / MAC</th>
                 <th>Danh mục</th>
                 <th>Vị trí / Kho</th>
+                <th>Số lượng</th>
                 <th>Tình trạng</th>
                 <th class="admin-only" style="text-align:right;">Thao tác nhanh</th>
               </tr>
@@ -277,16 +278,36 @@
     <div class="modal-card card">
       <h3 id="deviceModalTitle">Thêm thiết bị mới</h3>
       <form onsubmit="handleSaveDevice(event)">
-        <label>Mã thiết bị (*)</label>
-        <input type="text" id="devCode" required placeholder="VD: SW-C3560-01">
-        <label>Tên thiết bị (*)</label>
-        <input type="text" id="devName" required placeholder="VD: Switch Cisco Catalyst 3560">
-        <label>Model / Nhãn hiệu</label>
-        <input type="text" id="devModel" placeholder="VD: WS-C3560-24PS-S">
-        <label>Số Serial / Địa chỉ MAC</label>
-        <input type="text" id="devSerial" placeholder="VD: FOC12345678">
-        <label>Danh mục</label>
-        <select id="devCategory"></select>
+        <label>Danh mục *</label>
+        <select id="devCategory" required onchange="handleDeviceCategoryChange()"></select>
+        <label>Mã quản lý *</label>
+        <div class="code-entry-row">
+          <input type="text" id="devCode" required placeholder="Tự sinh theo danh mục; vẫn có thể sửa" oninput="markDeviceCodeManual()">
+          <button type="button" class="secondary" id="devCodeSuggestBtn" onclick="suggestDeviceCode(true)">Tạo mã</button>
+        </div>
+        <label>Tên tài sản / vật tư *</label>
+        <input type="text" id="devName" required placeholder="VD: Switch, cáp Cat6, ODF...">
+        <label>Hãng / Model / Quy cách</label>
+        <input type="text" id="devModel" placeholder="VD: Cisco C9200 / Cat6 ngoài trời">
+        <div id="devSerialWrap">
+          <label>Sê-ri / Serial / MAC (nếu có)</label>
+          <div class="code-entry-row">
+            <input type="text" id="devSerial" placeholder="Không bắt buộc; có thể quét tem">
+            <button type="button" class="secondary" onclick="scanForDeviceSerial()">📷 Quét</button>
+          </div>
+        </div>
+        <label>Cách quản lý *</label>
+        <select id="devTrackingMode" onchange="handleTrackingModeChange()">
+          <option value="individual">Theo từng tài sản / chiếc</option>
+          <option value="quantity">Theo số lượng tồn kho</option>
+        </select>
+        <div id="devQuantityWrap" class="quantity-entry-row">
+          <div><label>Số lượng *</label><input type="number" id="devQuantity" min="0.001" step="any" value="1" inputmode="decimal" required></div>
+          <div><label>Đơn vị *</label><input type="text" id="devUnit" list="unitSuggestions" value="cái" placeholder="cái, mét, sợi..." required></div>
+        </div>
+        <datalist id="unitSuggestions">
+          <option value="cái"><option value="chiếc"><option value="bộ"><option value="mét"><option value="m"><option value="cuộn"><option value="sợi"><option value="hộp"><option value="gói"><option value="kg"><option value="lít"><option value="thùng"><option value="ram"><option value="tờ">
+        </datalist>
         <label>Vị trí / Kho lưu trữ</label>
         <select id="devLocation"></select>
         <label>Tình trạng</label>
@@ -296,8 +317,8 @@
           <option value="Hỏng / Bảo hành">Hỏng / Bảo hành</option>
           <option value="Thanh lý">Thanh lý</option>
         </select>
-        <label>Ghi chú</label>
-        <input type="text" id="devNotes" placeholder="Ghi chú thêm...">
+        <label>Ghi chú (không bắt buộc)</label>
+        <input type="text" id="devNotes" placeholder="Thông số, vị trí lắp, quy cách...">
         <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('deviceModal')">Hủy</button>
           <button type="submit" class="primary">Lưu thiết bị</button>
@@ -313,6 +334,13 @@
       <form onsubmit="handleSaveMovement(event)">
         <label>Chọn thiết bị (*)</label>
         <select id="movDeviceCode" required onchange="handleSelectDeviceForMovement()"></select>
+        <label>Vị trí xuất / chuyển đi (*)</label>
+        <select id="movFromLocation" required onchange="handleMovementTypeChange()"></select>
+        <div id="movQuantityWrap" style="display:none;">
+          <label>Số lượng giao dịch (*)</label>
+          <input type="number" id="movQuantity" min="0.0001" step="any" inputmode="decimal" placeholder="Nhập số lượng cần xuất/chuyển">
+          <small class="muted" id="movAvailableQty"></small>
+        </div>
         <label>Loại giao dịch (*)</label>
         <select id="movType" onchange="handleMovementTypeChange()">
           <option value="Xuất kho">Xuất kho sử dụng</option>
