@@ -187,6 +187,7 @@
               <tr>
                 <th style="width:60px;">STT</th>
                 <th>Tên danh mục</th>
+                <th>Đơn vị tính mặc định</th>
                 <th>Số lượng</th>
                 <th class="admin-only" style="text-align:right;">Thao tác</th>
               </tr>
@@ -334,13 +335,6 @@
       <form onsubmit="handleSaveMovement(event)">
         <label>Chọn thiết bị (*)</label>
         <select id="movDeviceCode" required onchange="handleSelectDeviceForMovement()"></select>
-        <label>Vị trí xuất / chuyển đi (*)</label>
-        <select id="movFromLocation" required onchange="handleMovementTypeChange()"></select>
-        <div id="movQuantityWrap" style="display:none;">
-          <label>Số lượng giao dịch (*)</label>
-          <input type="number" id="movQuantity" min="0.0001" step="any" inputmode="decimal" placeholder="Nhập số lượng cần xuất/chuyển">
-          <small class="muted" id="movAvailableQty"></small>
-        </div>
         <label>Loại giao dịch (*)</label>
         <select id="movType" onchange="handleMovementTypeChange()">
           <option value="Xuất kho">Xuất kho sử dụng</option>
