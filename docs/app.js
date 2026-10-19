@@ -4,6 +4,7 @@ let STATE = {
   categories: [],
   categoryUnits: {},
   locations: [],
+  usageLocations: [],
   currentUser: null
 };
 
@@ -68,6 +69,15 @@ document.addEventListener("click", (e) => {
     editCategoryUnit(val);
   } else if (act === "dashboard-location") {
     openDashboardLocation(val);
+  } else if (act === "dashboard-usage-location") {
+    openDashboardUsageLocation(val);
+  } else if (act === "dashboard-usage-close") {
+    const detail = document.getElementById("dashboardUsageDetail");
+    if (detail) { detail.classList.add("hidden"); detail.innerHTML = ""; }
+  } else if (act === "edit-usage-loc") {
+    openUsageLocationModal(val);
+  } else if (act === "del-usage-loc") {
+    deleteUsageLocation(val);
   } else if (act === "dashboard-location-close") {
     const detail = document.getElementById("dashboardLocationDetail");
     if (detail) { detail.classList.add("hidden"); detail.innerHTML = ""; }
@@ -119,7 +129,8 @@ function showView(viewId) {
   const titles = {
     dashboard: "Tổng quan",
     devices: "Danh sách tài sản & vật tư",
-    locations: "Danh bạ Vị trí & Kho",
+    locations: "Kho lưu trữ",
+    usageLocations: "Nơi sử dụng",
     categories: "Danh mục thiết bị",
     movements: "Lịch sử điều chuyển & sự cố",
     reports: "Báo cáo & Nhập Excel",
@@ -131,6 +142,7 @@ function showView(viewId) {
   if (viewId === "users") loadUsers();
   if (viewId === "categories") renderCategories();
   if (viewId === "locations") renderLocations();
+  if (viewId === "usageLocations") renderUsageLocations();
 }
 
 async function handleLogin(e) {
@@ -205,6 +217,22 @@ async function loadState() {
       "Kho thanh lý / Chờ xử lý",
       "Tủ Rack Server - Trung tâm dữ liệu"
     ];
+    STATE.usageLocations = Array.isArray(data.usageLocations) ? data.usageLocations.map(l => typeof l === "string" ? { id: l, name: l, department: "", manager: "", address: "" } : l) : [];
+    // Giữ hiển thị các địa điểm của tài sản cũ đang sử dụng để không làm mất khả năng thu hồi; admin có thể chuẩn hóa vào danh mục.
+    const knownUsageNames = new Set(STATE.usageLocations.map(l => String(l.name || l).trim().toLowerCase()));
+    for (const d of STATE.devices) {
+      const oldPlace = d.status === "Đang sử dụng" ? String(d.usageLocation || d.location || "").trim() : "";
+      if (oldPlace && !knownUsageNames.has(oldPlace.toLowerCase())) {
+        STATE.usageLocations.push({ id: "", name: oldPlace, department: "", manager: "", address: "", legacy: true });
+        knownUsageNames.add(oldPlace.toLowerCase());
+      }
+      if (d.trackingMode === "quantity") for (const oldPlaceQty of Object.keys(d.usageByLocation || {})) {
+        if (Number(d.usageByLocation[oldPlaceQty] || 0) > 0 && !knownUsageNames.has(oldPlaceQty.toLowerCase())) {
+          STATE.usageLocations.push({ id: "", name: oldPlaceQty, department: "", manager: "", address: "", legacy: true });
+          knownUsageNames.add(oldPlaceQty.toLowerCase());
+        }
+      }
+    }
 
     renderDashboard();
     populateSelects();
@@ -212,6 +240,7 @@ async function loadState() {
     renderMovements();
     renderCategories();
     renderLocations();
+    renderUsageLocations();
 
     if (statusEl) statusEl.innerText = "Đã đồng bộ";
   } catch (err) {
@@ -219,41 +248,62 @@ async function loadState() {
   }
 }
 
+function sumQtyMap(map) { return Object.values(map || {}).reduce((sum, n) => sum + (Number(n) || 0), 0); }
+function deviceStockQuantity(d) { return d.trackingMode === "quantity" ? sumQtyMap(d.stockByLocation) : (d.status === "Trong kho" ? 1 : 0); }
+function deviceUsageQuantity(d) { return d.trackingMode === "quantity" ? sumQtyMap(d.usageByLocation) : (d.status === "Đang sử dụng" ? 1 : 0); }
+function deviceDamagedQuantity(d) { return d.trackingMode === "quantity" ? sumQtyMap(d.damagedByLocation) + sumQtyMap(d.usageDamagedByLocation) : (/Hỏng|Bảo hành/i.test(d.status || "") ? 1 : 0); }
 function renderDashboard() {
   const total = document.getElementById("statTotalDevices");
   const qtyOf = d => Number.isFinite(Number(d.quantity)) && d.quantity !== "" ? Number(d.quantity) : 1;
-  if (total) total.innerText = STATE.devices.reduce((sum, d) => sum + qtyOf(d), 0).toLocaleString("vi-VN");
+  if (total) total.innerText = STATE.devices.reduce((sum, d) => sum + (d.status === "Thanh lý" ? 0 : qtyOf(d)), 0).toLocaleString("vi-VN");
   const inStock = document.getElementById("statInStock");
-  if (inStock) inStock.innerText = STATE.devices.filter(d => d.status === "Trong kho").reduce((sum, d) => sum + qtyOf(d), 0).toLocaleString("vi-VN");
+  if (inStock) inStock.innerText = STATE.devices.reduce((sum, d) => sum + deviceStockQuantity(d), 0).toLocaleString("vi-VN");
   const inUse = document.getElementById("statInUse");
-  if (inUse) inUse.innerText = STATE.devices.filter(d => d.status === "Đang sử dụng").reduce((sum, d) => sum + qtyOf(d), 0).toLocaleString("vi-VN");
+  if (inUse) inUse.innerText = STATE.devices.reduce((sum, d) => sum + deviceUsageQuantity(d), 0).toLocaleString("vi-VN");
   const faulty = document.getElementById("statFaulty");
-  if (faulty) faulty.innerText = STATE.devices.filter(d => (d.status || "").includes("Hỏng") || (d.status || "").includes("Thanh lý")).reduce((sum, d) => sum + qtyOf(d), 0).toLocaleString("vi-VN");
+  if (faulty) faulty.innerText = STATE.devices.reduce((sum, d) => sum + deviceDamagedQuantity(d), 0).toLocaleString("vi-VN");
   renderDashboardLocations();
+  renderDashboardUsageLocations();
 }
 
 function getDeviceQuantityAtLocation(device, location) {
   const qty = Number(device.quantity);
-  if (device.trackingMode === "quantity" && device.stockByLocation && typeof device.stockByLocation === "object") {
-    return Math.max(0, Number(device.stockByLocation[location]) || 0);
+  if (device.trackingMode === "quantity") {
+    return Math.max(0, Number((device.stockByLocation || {})[location] || 0) + Number((device.damagedByLocation || {})[location] || 0) + Number((device.usageByLocation || {})[location] || 0) + Number((device.usageDamagedByLocation || {})[location] || 0));
   }
   const same = String(device.location || "").trim().toLowerCase() === String(location || "").trim().toLowerCase();
   return same ? (Number.isFinite(qty) && qty > 0 ? qty : 1) : 0;
 }
 
+function getWarehouseQuantityAtLocation(device, location) {
+  if (device.trackingMode === "quantity") return Math.max(0, Number((device.stockByLocation || {})[location] || 0) + Number((device.damagedByLocation || {})[location] || 0));
+  if (device.status === "Đang sử dụng" || device.status === "Thanh lý") return 0;
+  return String(device.location || "").trim().toLowerCase() === String(location || "").trim().toLowerCase() ? 1 : 0;
+}
+function displayDeviceStatus(d) {
+  if (d.trackingMode !== "quantity") return d.status || "Chưa xác định";
+  const stock = sumQtyMap(d.stockByLocation), use = sumQtyMap(d.usageByLocation), damaged = sumQtyMap(d.damagedByLocation) + sumQtyMap(d.usageDamagedByLocation);
+  const labels = [];
+  if (stock > 0) labels.push("Trong kho");
+  if (use > 0) labels.push("Đang sử dụng");
+  if (damaged > 0) labels.push("Hỏng / Bảo hành");
+  return labels.join(" / ") || "Hết tồn";
+}
+
 function renderDashboardLocations() {
   const container = document.getElementById("dashboardLocations");
   if (!container) return;
-  const locations = [...new Set([...(STATE.locations || []), ...STATE.devices.map(d => d.location).filter(Boolean)])];
+  const usageNames = (STATE.usageLocations || []).map(l => l.name || l);
+  const locations = [...new Set([...(STATE.locations || []).filter(loc => !usageNames.includes(loc) || STATE.devices.some(d => getWarehouseQuantityAtLocation(d, loc) > 0)), ...STATE.devices.map(d => d.location).filter(loc => loc && !usageNames.includes(loc))])];
   if (!locations.length) {
     container.innerHTML = '<div class="muted">Chưa có vị trí/kho. Hãy thêm vị trí trong mục Danh bạ Vị trí & Kho.</div>';
     return;
   }
   container.style.gridTemplateColumns = "repeat(auto-fit, minmax(210px, 1fr))";
   container.innerHTML = locations.map(loc => {
-    const records = STATE.devices.filter(d => getDeviceQuantityAtLocation(d, loc) > 0);
-    const qty = records.reduce((sum, d) => sum + getDeviceQuantityAtLocation(d, loc), 0);
-    const damaged = records.filter(d => (d.status || "").includes("Hỏng") || (d.status || "").includes("Thanh lý")).reduce((sum, d) => sum + getDeviceQuantityAtLocation(d, loc), 0);
+    const records = STATE.devices.filter(d => getWarehouseQuantityAtLocation(d, loc) > 0);
+    const qty = records.reduce((sum, d) => sum + getWarehouseQuantityAtLocation(d, loc), 0);
+    const damaged = records.reduce((sum, d) => sum + (d.trackingMode === "quantity" ? Number((d.damagedByLocation || {})[loc] || 0) : (/Hỏng|Bảo hành/i.test(d.status || "") ? getWarehouseQuantityAtLocation(d, loc) : 0)), 0);
     return `<button type="button" data-act="dashboard-location" data-val="${escapeAttr(loc)}" class="card" style="text-align:left; cursor:pointer; border:1px solid var(--border-color, #dbe2ea); padding:14px; background:var(--card-bg, #fff); color:inherit; min-height:120px;">
       <div style="font-size:22px; margin-bottom:8px;">📦</div>
       <div style="font-weight:700; line-height:1.35;">${escapeHtml(loc)}</div>
@@ -264,15 +314,39 @@ function renderDashboardLocations() {
   }).join("");
 }
 
+function getDeviceUsageAtLocation(device, location) {
+  if (device.trackingMode === "quantity") return Math.max(0, Number((device.usageByLocation || {})[location] || 0) + Number((device.usageDamagedByLocation || {})[location] || 0));
+  return device.status === "Đang sử dụng" && String(device.usageLocation || device.location || "").trim().toLowerCase() === String(location || "").trim().toLowerCase() ? 1 : 0;
+}
+function renderDashboardUsageLocations() {
+  const container = document.getElementById("dashboardUsageLocations"); if (!container) return;
+  const places = (STATE.usageLocations || []).map(l => l.name || l);
+  if (!places.length) { container.innerHTML = '<div class="muted">Chưa có nơi sử dụng. Hãy khai báo cơ sở, tòa nhà, phòng hoặc công trình.</div>'; return; }
+  container.style.gridTemplateColumns = "repeat(auto-fit, minmax(210px, 1fr))";
+  container.innerHTML = places.map(loc => {
+    const records = STATE.devices.filter(d => getDeviceUsageAtLocation(d, loc) > 0);
+    const qty = records.reduce((sum, d) => sum + getDeviceUsageAtLocation(d, loc), 0);
+    return `<button type="button" data-act="dashboard-usage-location" data-val="${escapeAttr(loc)}" class="card" style="text-align:left; cursor:pointer; border:1px solid var(--border-color, #dbe2ea); padding:14px; background:var(--card-bg, #fff); color:inherit; min-height:120px;"><div style="font-size:22px; margin-bottom:8px;">📍</div><div style="font-weight:700; line-height:1.35;">${escapeHtml(loc)}</div><div style="font-size:22px; font-weight:800; margin-top:8px;">${qty.toLocaleString("vi-VN")}</div><div class="muted" style="font-size:12px;">${records.length} mã tài sản/vật tư</div><div style="font-size:12px; color:#2563eb; margin-top:8px;">Xem danh sách →</div></button>`;
+  }).join("");
+}
+function openDashboardUsageLocation(location) {
+  const detail = document.getElementById("dashboardUsageDetail"); if (!detail) return;
+  const records = STATE.devices.filter(d => getDeviceUsageAtLocation(d, location) > 0);
+  const rows = records.map(d => `<tr><td><b>${escapeHtml(d.code || "-")}</b></td><td>${escapeHtml(d.name || d.code || "-")}</td><td>${escapeHtml(d.category || "-")}</td><td>${getDeviceUsageAtLocation(d, location).toLocaleString("vi-VN")} ${escapeHtml(d.unit || "cái")}</td><td>${escapeHtml(displayDeviceStatus(d))}</td></tr>`).join("");
+  const total = records.reduce((sum,d) => sum + getDeviceUsageAtLocation(d, location), 0);
+  detail.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:start; gap:10px; flex-wrap:wrap;"><div><h3 style="margin:0 0 5px;">📍 ${escapeHtml(location)}</h3><div class="muted">${records.length} mã · tổng ${total.toLocaleString("vi-VN")}</div></div><div style="display:flex; gap:8px;"><button type="button" class="primary" onclick="showDevicesAtLocation('${escapeJs(location)}')">Mở danh sách đầy đủ</button><button type="button" class="secondary" data-act="dashboard-usage-close">Đóng</button></div></div>${records.length ? `<div style="overflow-x:auto; margin-top:12px;"><table class="table"><thead><tr><th>Mã</th><th>Tên</th><th>Danh mục</th><th>Số lượng tại nơi dùng</th><th>Tình trạng</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">Chưa có tài sản/vật tư được ghi nhận tại đây.</p>'}`;
+  detail.classList.remove("hidden"); detail.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
 function openDashboardLocation(location) {
   const detail = document.getElementById("dashboardLocationDetail");
   if (!detail) return;
-  const records = STATE.devices.filter(d => getDeviceQuantityAtLocation(d, location) > 0);
+  const records = STATE.devices.filter(d => getWarehouseQuantityAtLocation(d, location) > 0);
   const rows = records.map(d => {
-    const qty = getDeviceQuantityAtLocation(d, location);
-    return `<tr><td><b>${escapeHtml(d.code || "-")}</b></td><td>${escapeHtml(d.name || d.code || "-")}</td><td>${escapeHtml(d.category || "-")}</td><td>${qty.toLocaleString("vi-VN")} ${escapeHtml(d.unit || "cái")}</td><td>${escapeHtml(d.status || "Chưa xác định")}</td></tr>`;
+    const qty = getWarehouseQuantityAtLocation(d, location);
+    return `<tr><td><b>${escapeHtml(d.code || "-")}</b></td><td>${escapeHtml(d.name || d.code || "-")}</td><td>${escapeHtml(d.category || "-")}</td><td>${qty.toLocaleString("vi-VN")} ${escapeHtml(d.unit || "cái")}</td><td>${escapeHtml(displayDeviceStatus(d))}</td></tr>`;
   }).join("");
-  detail.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:start; gap:10px; flex-wrap:wrap;"><div><h3 style="margin:0 0 5px;">📍 ${escapeHtml(location)}</h3><div class="muted">${records.length} mã tài sản/vật tư · tổng số lượng ${records.reduce((sum,d) => sum + getDeviceQuantityAtLocation(d, location),0).toLocaleString("vi-VN")}</div></div><div style="display:flex; gap:8px;"><button type="button" class="primary" onclick="showDevicesAtLocation('${escapeJs(location)}')">Mở danh sách đầy đủ</button><button type="button" class="secondary" data-act="dashboard-location-close">Đóng</button></div></div>${records.length ? `<div style="overflow-x:auto; margin-top:12px;"><table class="table"><thead><tr><th>Mã</th><th>Tên tài sản/vật tư</th><th>Danh mục</th><th>Số lượng tại kho</th><th>Tình trạng</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">Kho này hiện chưa có thiết bị/vật tư được ghi nhận.</p>'}`;
+  detail.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:start; gap:10px; flex-wrap:wrap;"><div><h3 style="margin:0 0 5px;">📍 ${escapeHtml(location)}</h3><div class="muted">${records.length} mã tài sản/vật tư · tổng số lượng ${records.reduce((sum,d) => sum + getWarehouseQuantityAtLocation(d, location),0).toLocaleString("vi-VN")}</div></div><div style="display:flex; gap:8px;"><button type="button" class="primary" onclick="showDevicesAtLocation('${escapeJs(location)}')">Mở danh sách đầy đủ</button><button type="button" class="secondary" data-act="dashboard-location-close">Đóng</button></div></div>${records.length ? `<div style="overflow-x:auto; margin-top:12px;"><table class="table"><thead><tr><th>Mã</th><th>Tên tài sản/vật tư</th><th>Danh mục</th><th>Số lượng tại kho</th><th>Tình trạng</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">Kho này hiện chưa có thiết bị/vật tư được ghi nhận.</p>'}`;
   detail.classList.remove("hidden");
   detail.scrollIntoView({behavior:"smooth", block:"start"});
 }
@@ -344,13 +418,13 @@ function renderDevices() {
         <td>${d.model || "-"}</td>
         <td><code>${d.serial || "-"}</code></td>
         <td>${d.category || ""}</td>
-        <td><b>${d.trackingMode === "quantity" && d.stockByLocation && Object.keys(d.stockByLocation).some(loc => Number(d.stockByLocation[loc]) > 0) ? Object.entries(d.stockByLocation).filter(([loc, qty]) => Number(qty) > 0).map(([loc, qty]) => `${loc}: ${Number(qty).toLocaleString("vi-VN")} ${d.unit || "cái"}`).join("; ") : (d.location || "-")}</b></td>
-        <td><b>${Number(d.quantity) > 0 ? Number(d.quantity).toLocaleString("vi-VN") : "1"} ${d.unit || "cái"}</b></td>
+        <td><b>${d.trackingMode === "quantity" ? [...Object.entries(d.stockByLocation || {}).filter(([loc, qty]) => Number(qty) > 0).map(([loc, qty]) => `${loc}: ${Number(qty).toLocaleString("vi-VN")} ${d.unit || "cái"}`), ...Object.entries(d.usageByLocation || {}).filter(([loc, qty]) => Number(qty) > 0).map(([loc, qty]) => `Đang dùng - ${loc}: ${Number(qty).toLocaleString("vi-VN")} ${d.unit || "cái"}`), ...Object.entries(d.damagedByLocation || {}).filter(([loc, qty]) => Number(qty) > 0).map(([loc, qty]) => `Hỏng tại ${loc}: ${Number(qty).toLocaleString("vi-VN")} ${d.unit || "cái"}`), ...Object.entries(d.usageDamagedByLocation || {}).filter(([loc, qty]) => Number(qty) > 0).map(([loc, qty]) => `Hỏng tại nơi dùng ${loc}: ${Number(qty).toLocaleString("vi-VN")} ${d.unit || "cái"}`)].join("; ") || (d.location || "-") : (d.usageLocation || d.location || "-")}</b></td>
+        <td><b>${d.trackingMode === "quantity" ? Number(d.quantity || 0).toLocaleString("vi-VN") : "1"} ${d.unit || "cái"}</b></td>
         <td>
           <span class="badge ${
             d.status === 'Trong kho' ? 'badge-primary' : 
             (d.status === 'Đang sử dụng' ? 'badge-secondary' : 'badge-danger')
-          }">${d.status || "Trong kho"}</span>
+          }">${escapeHtml(displayDeviceStatus(d))}</span>
         </td>
         ${isAdmin ? `
           <td style="text-align:right; white-space:nowrap;">
@@ -572,75 +646,83 @@ async function handleSaveDevice(e) {
 // ĐIỀU CHUYỂN / BÁO SỰ CỐ
 // ----------------------------------------------------
 function openMovementModal(deviceCode = null) {
-  populateSelects();
-  showModalById("movementModal");
-
-  if (deviceCode) {
-    const clean = String(deviceCode).trim().toLowerCase();
-    const dev = STATE.devices.find(d => String(d.code).trim().toLowerCase() === clean);
-    if (dev) {
-      setElementValueSafe("movDeviceCode", dev.code, true);
-      setElementValueSafe("movToLocation", dev.location || "", true);
-    }
-  }
-
-  handleMovementTypeChange();
+  populateSelects(); showModalById("movementModal");
+  setElementValueSafe("movType", "Xuất kho sử dụng", true);
+  ["movNote", "movDepartment", "movRecipient", "movReferenceNo"].forEach(id => setElementValueSafe(id, ""));
+  if (deviceCode) setElementValueSafe("movDeviceCode", deviceCode, true);
+  const chosen = STATE.devices.find(d => String(d.code).toLowerCase() === String(document.getElementById("movDeviceCode")?.value).toLowerCase());
+  if (chosen?.status === "Đang sử dụng") setElementValueSafe("movType", "Điều chuyển nơi sử dụng", true);
+  else if (/Hỏng|Bảo hành/i.test(chosen?.status || "")) setElementValueSafe("movType", "Đã sửa xong / Nhập lại kho", true);
+  else if (chosen?.trackingMode === "quantity" && sumQtyMap(chosen.stockByLocation) <= 0 && sumQtyMap(chosen.usageByLocation) > 0) setElementValueSafe("movType", "Thu hồi về kho", true);
+  handleSelectDeviceForMovement();
 }
-
 function handleSelectDeviceForMovement() {
+  const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(document.getElementById("movDeviceCode")?.value).toLowerCase());
+  const qtyWrap = document.getElementById("movQuantityWrap"); if (qtyWrap) qtyWrap.classList.toggle("hidden", dev?.trackingMode !== "quantity");
+  if (dev?.trackingMode === "quantity") setElementValueSafe("movQuantity", "1");
+  const fromW = document.getElementById("movFromLocation");
+  if (fromW) { const map = dev?.stockByLocation || {}; const opts = STATE.locations.filter(l => dev?.trackingMode !== "quantity" || Number(map[l] || 0) > 0); fromW.innerHTML = (opts.length ? opts : STATE.locations).map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}${dev?.trackingMode === "quantity" ? ` — còn ${Number(map[l] || 0).toLocaleString("vi-VN")} ${escapeHtml(dev.unit || "cái")}` : ""}</option>`).join(""); if (dev?.location && Array.from(fromW.options).some(o => o.value === dev.location)) fromW.value = dev.location; }
+  const fromU = document.getElementById("movFromUsageLocation");
+  if (fromU) { const map = dev?.usageByLocation || {}; const places = STATE.usageLocations.map(l => l.name || l); const opts = places.filter(l => dev?.trackingMode !== "quantity" || Number(map[l] || 0) > 0); fromU.innerHTML = (opts.length ? opts : places).map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}${dev?.trackingMode === "quantity" ? ` — đang dùng ${Number(map[l] || 0).toLocaleString("vi-VN")} ${escapeHtml(dev.unit || "cái")}` : ""}</option>`).join(""); const currentUse = dev?.usageLocation || (dev?.status === "Đang sử dụng" ? dev.location : "") || Object.keys(map).find(l => Number(map[l]) > 0); if (currentUse && Array.from(fromU.options).some(o => o.value === currentUse)) fromU.value = currentUse; }
+  const sourceType = document.getElementById("movDamageSourceType");
+  if (sourceType && dev) {
+    const hasUsage = dev.trackingMode === "quantity" ? sumQtyMap(dev.usageByLocation) > 0 : dev.status === "Đang sử dụng";
+    sourceType.value = hasUsage && (dev.status === "Đang sử dụng" || sumQtyMap(dev.stockByLocation) <= 0) ? "usage" : "warehouse";
+  }
   handleMovementTypeChange();
 }
-
 function handleMovementTypeChange() {
-  const typeEl = document.getElementById("movType");
-  if (!typeEl) return;
-  const type = typeEl.value;
-  const devCode = document.getElementById("movDeviceCode")?.value;
-  const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(devCode).toLowerCase());
-  const noteInput = document.getElementById("movNote");
-
-  if (type === "Báo hỏng / Đi bảo hành") {
-    const loc = STATE.locations.find(l => l.includes("Kho")) || STATE.locations[0] || "Kho kỹ thuật";
-    setElementValueSafe("movToLocation", loc, true);
-    if (noteInput) noteInput.placeholder = "VD: Cháy nguồn, hỏng quạt...";
-  } else if (type === "Đã sửa xong / Nhập lại kho") {
-    const loc = STATE.locations.find(l => l.includes("dự phòng") || l.includes("Kho")) || STATE.locations[0] || "Kho dự phòng";
-    setElementValueSafe("movToLocation", loc, true);
-    if (noteInput) noteInput.placeholder = "VD: Đã thay linh kiện, hoạt động tốt";
-  } else if (type === "Báo thanh lý") {
-    const loc = STATE.locations.find(l => l.includes("thanh lý")) || STATE.locations[0] || "Kho thanh lý";
-    setElementValueSafe("movToLocation", loc, true);
-    if (noteInput) noteInput.placeholder = "VD: Hỏng bo mạch chính không thể sửa...";
-  } else {
-    if (dev?.location) setElementValueSafe("movToLocation", dev.location, true);
-    if (noteInput) noteInput.placeholder = "Ghi chú thêm...";
+  const type = document.getElementById("movType")?.value || "Xuất kho sử dụng";
+  const isIn = type === "Nhập kho", isUseOut = type === "Xuất kho sử dụng", isTransfer = type === "Điều chuyển kho", isReturn = type === "Thu hồi về kho", isUseTransfer = type === "Điều chuyển nơi sử dụng", isRepair = type === "Đã sửa xong / Nhập lại kho", isDamage = type === "Báo hỏng / Đi bảo hành", isDispose = type === "Báo thanh lý";
+  const sourceTypeEl = document.getElementById("movDamageSourceType");
+  const sourceType = sourceTypeEl?.value || "warehouse";
+  const needsSourceChoice = isDamage || isDispose;
+  document.getElementById("movDamageSourceWrap")?.classList.toggle("hidden", !needsSourceChoice);
+  const showFromW = !isIn && !isReturn && !isUseTransfer && (!needsSourceChoice || sourceType === "warehouse");
+  const showFromU = isReturn || isUseTransfer || (needsSourceChoice && sourceType === "usage");
+  const showToW = isIn || isTransfer || isReturn || isDamage || isRepair;
+  const showUsage = isUseOut || isUseTransfer;
+  document.getElementById("movFromWarehouseWrap")?.classList.toggle("hidden", !showFromW);
+  document.getElementById("movFromUsageWrap")?.classList.toggle("hidden", !showFromU);
+  document.getElementById("movToWarehouseWrap")?.classList.toggle("hidden", !showToW);
+  document.getElementById("movUsageWrap")?.classList.toggle("hidden", !showUsage);
+  const to = document.getElementById("movToLocation"); if (to) to.required = showToW;
+  const use = document.getElementById("movUsageLocation"); if (use) use.required = showUsage;
+  const fw = document.getElementById("movFromLocation"); if (fw) fw.required = showFromW;
+  const fu = document.getElementById("movFromUsageLocation"); if (fu) fu.required = isReturn || isUseTransfer || (needsSourceChoice && sourceType === "usage");
+  const dev = STATE.devices.find(d => d.code === document.getElementById("movDeviceCode")?.value);
+  if (dev?.trackingMode === "quantity") {
+    const map = isRepair ? (dev.damagedByLocation || {}) : (dev.stockByLocation || {});
+    const opts = STATE.locations.filter(l => Number(map[l] || 0) > 0);
+    if (fw) { const previous = fw.value; fw.innerHTML = (opts.length ? opts : STATE.locations).map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}${opts.length ? ` — ${isRepair ? "hàng hỏng" : "còn"} ${Number(map[l] || 0).toLocaleString("vi-VN")} ${escapeHtml(dev.unit || "cái")}` : ""}</option>`).join(""); if (opts.includes(previous)) fw.value = previous; }
   }
+  if ((isIn || isTransfer || isReturn || isRepair) && to && !to.value) setElementValueSafe("movToLocation", STATE.locations[0] || "", true);
+  if (isUseTransfer) { const targetUse = document.getElementById("movUsageLocation"); const sourceUse = document.getElementById("movFromUsageLocation")?.value; const alternative = STATE.usageLocations.map(l => l.name || l).find(l => l !== sourceUse); if (targetUse && alternative && targetUse.value === sourceUse) targetUse.value = alternative; }
+  const note = document.getElementById("movNote"); if (note) note.placeholder = isIn ? "Nguồn nhập, số hóa đơn/biên bản..." : isUseOut ? "Mục đích cấp phát, công trình..." : isDamage ? "Mô tả hư hỏng..." : "Ghi chú / lý do giao dịch...";
+  const label = document.getElementById("movAvailableQty");
+  if (label && dev?.trackingMode === "quantity") { const source = (isReturn || isUseTransfer || (needsSourceChoice && sourceType === "usage")) ? Number((dev.usageByLocation || {})[fu?.value] || 0) : (isRepair ? Number((dev.damagedByLocation || {})[fw?.value] || 0) : Number((dev.stockByLocation || {})[fw?.value] || 0)); label.textContent = `Số dư nguồn hiện tại: ${source.toLocaleString("vi-VN")} ${dev.unit || "cái"}`; } else if (label) label.textContent = "";
 }
-
 async function handleSaveMovement(e) {
   e.preventDefault();
-  const deviceCode = document.getElementById("movDeviceCode")?.value;
-  const type = document.getElementById("movType")?.value;
-  const toLocation = document.getElementById("movToLocation")?.value;
-  const note = (document.getElementById("movNote")?.value || "").trim();
-  const dev = STATE.devices.find(d => d.code === deviceCode);
-
-  let newStatus = "Đang sử dụng";
-  if (type === "Báo hỏng / Đi bảo hành") newStatus = "Hỏng / Bảo hành";
-  else if (type === "Đã sửa xong / Nhập lại kho") newStatus = "Trong kho";
-  else if (type === "Báo thanh lý") newStatus = "Thanh lý";
-
-  await callMutate("movement.create", {
-    deviceCode,
-    type,
-    fromLocation: dev ? dev.location : "",
-    toLocation,
-    status: newStatus,
-    note
-  });
-
-  closeModal("movementModal");
-  loadState();
+  const deviceCode = document.getElementById("movDeviceCode")?.value, type = document.getElementById("movType")?.value;
+  const dev = STATE.devices.find(d => d.code === deviceCode); if (!dev) return alert("Không tìm thấy mặt hàng.");
+  const isIn = type === "Nhập kho", isUseOut = type === "Xuất kho sử dụng", isTransfer = type === "Điều chuyển kho", isReturn = type === "Thu hồi về kho", isUseTransfer = type === "Điều chuyển nơi sử dụng", isRepair = type === "Đã sửa xong / Nhập lại kho", isDamage = type === "Báo hỏng / Đi bảo hành", isDispose = type === "Báo thanh lý";
+  const fromLocation = document.getElementById("movFromLocation")?.value || "", toLocation = document.getElementById("movToLocation")?.value || "", usageLocation = document.getElementById("movUsageLocation")?.value || "", fromUsage = document.getElementById("movFromUsageLocation")?.value || "";
+  const quantity = dev.trackingMode === "quantity" ? Number(document.getElementById("movQuantity")?.value) : 1;
+  let sourceUsage = (isReturn || isUseTransfer) ? fromUsage : "";
+  const damageSourceType = document.getElementById("movDamageSourceType")?.value || "warehouse";
+  if ((isDamage || isDispose) && damageSourceType === "usage") {
+    if (dev.trackingMode === "quantity") {
+      const availableAtUse = Number((dev.usageByLocation || {})[fromUsage] || 0);
+      if (availableAtUse < quantity) return alert(`Không đủ số lượng tại nơi sử dụng ${fromUsage}. Hiện có ${availableAtUse} ${dev.unit || "cái"}.`);
+      sourceUsage = fromUsage;
+    } else {
+      if (dev.status !== "Đang sử dụng") return alert("Tài sản cá thể không ở trạng thái đang sử dụng.");
+      sourceUsage = dev.usageLocation || dev.location || fromUsage;
+    }
+  }
+  const payload = { deviceCode, type, fromLocation: (isIn || isReturn || isUseTransfer || sourceUsage) ? "" : fromLocation, toLocation: (isUseOut || isUseTransfer || isDispose) ? "" : toLocation, usageLocation: (isUseOut || isUseTransfer) ? usageLocation : "", fromUsageLocation: sourceUsage, quantity, department: document.getElementById("movDepartment")?.value.trim() || "", recipient: document.getElementById("movRecipient")?.value.trim() || "", referenceNo: document.getElementById("movReferenceNo")?.value.trim() || "", note: document.getElementById("movNote")?.value.trim() || "" };
+  try { await callMutate("movement.create", payload); closeModal("movementModal"); await loadState(); } catch (err) { /* server validation already shown */ }
 }
 
 function renderMovements() {
@@ -651,9 +733,9 @@ function renderMovements() {
       <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
       <td><b>${m.deviceCode}</b></td>
       <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span></td>
-      <td>${m.fromLocation || "-"}</td>
-      <td><b>${m.toLocation || "-"}</b></td>
-      <td><small>${m.note || "-"}</small></td>
+      <td>${escapeHtml(m.fromLocation || m.fromUsageLocation || "-")}</td>
+      <td><b>${escapeHtml(m.toLocation || m.usageLocation || "-")}</b></td>
+      <td><small>${Number(m.quantity || 1).toLocaleString("vi-VN")} ${escapeHtml(m.unit || "cái")}${m.department ? ` · ${escapeHtml(m.department)}` : ""}${m.recipient ? ` · Người nhận: ${escapeHtml(m.recipient)}` : ""}${m.referenceNo ? ` · Phiếu: ${escapeHtml(m.referenceNo)}` : ""}${m.note ? ` · ${escapeHtml(m.note)}` : ""}</small></td>
       <td>${m.createdBy || "-"}</td>
     </tr>
   `).join("");
@@ -663,46 +745,29 @@ function renderMovements() {
 // VỊ TRÍ & KHO (LOCATIONS)
 // ----------------------------------------------------
 function renderLocations() {
-  const tbody = document.getElementById("locationTableBody");
-  if (!tbody) return;
+  const tbody = document.getElementById("locationTableBody"); if (!tbody) return;
   const isAdmin = STATE.currentUser?.role === "admin";
-
   tbody.innerHTML = STATE.locations.map((loc, idx) => {
-    const count = STATE.devices.filter(d => String(d.location).trim().toLowerCase() === String(loc).trim().toLowerCase()).reduce((sum, d) => sum + (Number(d.quantity) || 1), 0);
-    return `
-      <tr>
-        <td>${idx + 1}</td>
-        <td><b>${loc}</b></td>
-        <td><span class="badge badge-secondary">${count} thiết bị</span></td>
-        ${isAdmin ? `
-          <td style="text-align:right;">
-            <button type="button" data-act="rename-loc" data-val="${loc}" style="cursor:pointer; margin-right:5px;">Đổi tên</button>
-            <button type="button" data-act="del-loc" data-val="${loc}" style="color:red; cursor:pointer;">Xóa</button>
-          </td>` : `<td></td>`}
-      </tr>
-    `;
+    const count = STATE.devices.reduce((sum, d) => sum + (d.trackingMode === "quantity" ? Number((d.stockByLocation || {})[loc] || 0) + Number((d.damagedByLocation || {})[loc] || 0) : (d.status !== "Đang sử dụng" && d.location === loc ? 1 : 0)), 0);
+    return `<tr><td>${idx + 1}</td><td><b>${escapeHtml(loc)}</b></td><td><span class="badge badge-secondary">${count.toLocaleString("vi-VN")} đơn vị</span></td>${isAdmin ? `<td style="text-align:right;"><button type="button" data-act="rename-loc" data-val="${escapeAttr(loc)}">Đổi tên</button> <button type="button" data-act="del-loc" data-val="${escapeAttr(loc)}" style="color:red">Xóa</button></td>` : `<td></td>`}</tr>`;
   }).join("");
 }
-
-async function openAddLocationModal() {
-  const name = prompt("Nhập tên Vị trí / Kho mới:");
-  if (!name || !name.trim()) return;
-  await callMutate("location.add", { name: name.trim() });
-  await loadState();
+async function openAddLocationModal() { const name = prompt("Nhập tên kho lưu trữ mới:"); if (!name || !name.trim()) return; try { await callMutate("location.add", { name: name.trim() }); await loadState(); } catch(e) {} }
+async function renameLocation(oldName) { const newName = prompt(`Đổi tên kho "${oldName}" thành:`, oldName); if (!newName || !newName.trim() || newName.trim() === oldName) return; try { await callMutate("location.update", { oldName, newName: newName.trim() }); await loadState(); } catch(e) {} }
+async function deleteLocation(name) { if (!confirm(`Bạn có chắc muốn xóa kho "${name}"?`)) return; try { await callMutate("location.delete", { name }); await loadState(); } catch(e) {} }
+function renderUsageLocations() {
+  const tbody = document.getElementById("usageLocationTableBody"); if (!tbody) return;
+  const isAdmin = STATE.currentUser?.role === "admin";
+  tbody.innerHTML = STATE.usageLocations.map((l, idx) => { const name = l.name || l; const qty = STATE.devices.reduce((sum,d) => sum + getDeviceUsageAtLocation(d,name),0); return `<tr><td>${idx+1}</td><td><b>${escapeHtml(name)}</b></td><td>${escapeHtml(l.department || "-")}</td><td>${escapeHtml(l.manager || "-")}</td><td>${escapeHtml(l.address || "-")}</td><td><span class="badge badge-secondary">${qty.toLocaleString("vi-VN")}</span></td><td>${isAdmin ? (l.legacy ? `<button type="button" data-act="edit-usage-loc" data-val="${escapeAttr(name)}">Khai báo</button>` : `<button type="button" data-act="edit-usage-loc" data-val="${escapeAttr(l.id || name)}">Sửa</button> <button type="button" data-act="del-usage-loc" data-val="${escapeAttr(l.id || name)}" style="color:#b91c1c">Xóa</button>`) : (l.legacy ? `<span class="badge badge-danger">Chưa chuẩn hóa</span>` : "")}</td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">Chưa có nơi sử dụng.</td></tr>`;
 }
-
-async function renameLocation(oldName) {
-  const newName = prompt(`Đổi tên vị trí/kho "${oldName}" thành:`, oldName);
-  if (!newName || !newName.trim() || newName.trim() === oldName) return;
-  await callMutate("location.update", { oldName, newName: newName.trim() });
-  await loadState();
+function openUsageLocationModal(idOrName = null) {
+  const found = idOrName ? STATE.usageLocations.find(l => String(l.id || l.name || l) === String(idOrName) || String(l.name || l) === String(idOrName)) : null;
+  const title = document.getElementById("usageLocationModalTitle"); if (title) title.innerText = found ? "Sửa nơi sử dụng" : "Thêm nơi sử dụng";
+  setElementValueSafe("usageLocationId", found?.id || ""); setElementValueSafe("usageLocationOldName", found?.name || found || ""); setElementValueSafe("usageLocationName", found?.name || found || "");
+  setElementValueSafe("usageLocationDepartment", found?.department || ""); setElementValueSafe("usageLocationManager", found?.manager || ""); setElementValueSafe("usageLocationAddress", found?.address || ""); showModalById("usageLocationModal");
 }
-
-async function deleteLocation(name) {
-  if (!confirm(`Bạn có chắc muốn xóa vị trí "${name}"?`)) return;
-  await callMutate("location.delete", { name });
-  await loadState();
-}
+async function saveUsageLocation(e) { e.preventDefault(); const id = document.getElementById("usageLocationId").value, oldName = document.getElementById("usageLocationOldName").value; const found = STATE.usageLocations.find(l => String(l.name || l).toLowerCase() === String(oldName).toLowerCase()); const payload = { id, oldName, name: document.getElementById("usageLocationName").value.trim(), department: document.getElementById("usageLocationDepartment").value.trim(), manager: document.getElementById("usageLocationManager").value.trim(), address: document.getElementById("usageLocationAddress").value.trim() }; const action = found?.legacy || (!id && !oldName) ? "usage-location.add" : "usage-location.update"; try { await callMutate(action, payload); closeModal("usageLocationModal"); await loadState(); } catch(e) {} }
+async function deleteUsageLocation(idOrName) { const found = STATE.usageLocations.find(l => String(l.id || l.name || l) === String(idOrName) || String(l.name || l) === String(idOrName)); if (!found || !confirm(`Xóa nơi sử dụng "${found.name || found}"? Chỉ xóa được khi không còn hàng tại đây.`)) return; try { await callMutate("usage-location.delete", { id: found.id || "", name: found.name || found }); await loadState(); } catch(e) {} }
 
 // ----------------------------------------------------
 // DANH MỤC (CATEGORIES)
@@ -764,37 +829,26 @@ async function deleteCategory(name) {
 
 // NẠP DỮ LIỆU SELECT DROPDOWN
 function populateSelects() {
-  const catOptions = STATE.categories.map(c => `<option value="${c}">${c}</option>`).join("");
-  const devCat = document.getElementById("devCategory");
-  if (devCat && devCat.tagName === "SELECT") devCat.innerHTML = catOptions;
-
-  const filterCat = document.getElementById("filterCategory");
-  if (filterCat && filterCat.tagName === "SELECT") filterCat.innerHTML = `<option value="">-- Tất cả danh mục --</option>` + catOptions;
-
-  const locOptions = STATE.locations.map(l => `<option value="${l}">${l}</option>`).join("");
-  const devLoc = document.getElementById("devLocation");
-  if (devLoc && devLoc.tagName === "SELECT") devLoc.innerHTML = locOptions;
-
-  const movLoc = document.getElementById("movToLocation");
-  if (movLoc && movLoc.tagName === "SELECT") movLoc.innerHTML = locOptions;
-
-  const bulkLoc = document.getElementById("bulkToLocation");
-  if (bulkLoc && bulkLoc.tagName === "SELECT") bulkLoc.innerHTML = locOptions;
-
-  const filterLoc = document.getElementById("filterLocation");
-  if (filterLoc && filterLoc.tagName === "SELECT") filterLoc.innerHTML = `<option value="">-- Tất cả vị trí & kho --</option>` + locOptions;
-
-  const movDev = document.getElementById("movDeviceCode");
-  if (movDev && movDev.tagName === "SELECT") {
-    movDev.innerHTML = STATE.devices.map(d => `<option value="${d.code}">${d.code} - ${d.name || d.code} (${d.location || 'Chưa gán'})</option>`).join("");
-  }
+  const catOptions = STATE.categories.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("");
+  const devCat = document.getElementById("devCategory"); if (devCat) devCat.innerHTML = catOptions;
+  const filterCat = document.getElementById("filterCategory"); if (filterCat) filterCat.innerHTML = `<option value="">-- Tất cả danh mục --</option>` + catOptions;
+  const locOptions = STATE.locations.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join("");
+  const devLoc = document.getElementById("devLocation"); if (devLoc) devLoc.innerHTML = locOptions;
+  ["movToLocation","movFromLocation","bulkToLocation"].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = locOptions; });
+  const usageOptions = STATE.usageLocations.map(l => `<option value="${escapeAttr(l.name || l)}">${escapeHtml(l.name || l)}</option>`).join("");
+  ["movUsageLocation","movFromUsageLocation"].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = usageOptions; });
+  const filterLoc = document.getElementById("filterLocation"); if (filterLoc) filterLoc.innerHTML = `<option value="">-- Tất cả vị trí & kho --</option>` + locOptions + usageOptions;
+  const movDev = document.getElementById("movDeviceCode"); if (movDev) movDev.innerHTML = STATE.devices.map(d => `<option value="${escapeAttr(d.code)}">${escapeHtml(d.code)} - ${escapeHtml(d.name || d.code)} (${escapeHtml(d.location || "Chưa gán")})</option>`).join("");
 }
 
 // ĐIỀU CHUYỂN HÀNG LOẠT
 function openBulkMovementModal() {
+  const selected = STATE.devices.filter(d => selectedCodes.has(d.code));
+  if (!selected.length) return alert("Chưa chọn tài sản.");
+  if (selected.some(d => d.trackingMode === "quantity" || d.status !== "Trong kho")) return alert("Điều chuyển hàng loạt chỉ áp dụng cho tài sản quản lý từng chiếc và đang ở trạng thái Trong kho. Vật tư theo số lượng hoặc tài sản đang sử dụng cần lập phiếu riêng.");
   showModalById("bulkMovementModal");
   const desc = document.getElementById("bulkModalDesc");
-  if (desc) desc.innerText = `Đang thao tác cho ${selectedCodes.size} thiết bị đã chọn`;
+  if (desc) desc.innerText = `Đang thao tác cho ${selectedCodes.size} tài sản đã chọn`;
 }
 
 function handleBulkTypeChange() {
@@ -1009,10 +1063,10 @@ function exportDevicesCSV() {
 }
 
 function exportMovementsCSV() {
-  const headers = ["Thời gian", "Mã thiết bị", "Loại giao dịch", "Từ vị trí", "Đến vị trí", "Lý do/Ghi chú", "Người thực hiện"];
+  const headers = ["Thời gian", "Mã thiết bị", "Loại giao dịch", "Từ kho", "Từ nơi sử dụng", "Đến kho", "Đến nơi sử dụng", "Số lượng", "Đơn vị", "Đơn vị nhận", "Người nhận", "Số phiếu/công trình", "Lý do/Ghi chú", "Người thực hiện"];
   const rows = [headers];
   STATE.movements.forEach(m => {
-    rows.push([m.createdAt || "", m.deviceCode, m.type, m.fromLocation || "", m.toLocation || "", m.note || "", m.createdBy || ""]);
+    rows.push([m.createdAt || "", m.deviceCode, m.type, m.fromLocation || "", m.fromUsageLocation || "", m.toLocation || "", m.usageLocation || "", m.quantity ?? 1, m.unit || "cái", m.department || "", m.recipient || "", m.referenceNo || "", m.note || "", m.createdBy || ""]);
   });
   downloadCSV(`lich_su_dieu_chuyen_${new Date().toISOString().slice(0,10)}.csv`, rows);
 }
