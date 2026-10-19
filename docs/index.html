@@ -369,7 +369,8 @@
     <div class="modal-card card">
       <h3 id="movementModalTitle">Tạo phiếu điều chuyển / Báo sự cố</h3>
       <form onsubmit="handleSaveMovement(event)">
-        <label>Chọn thiết bị / vật tư (*)</label>
+        <label>Tìm thiết bị / vật tư (*)</label>
+        <input id="movDeviceSearch" type="search" placeholder="Gõ mã, tên, serial hoặc vị trí để lọc..." oninput="filterMovementDevices()">
         <select id="movDeviceCode" required onchange="handleSelectDeviceForMovement()"></select>
         <label>Loại giao dịch (*)</label>
         <select id="movType" onchange="handleMovementTypeChange()">
@@ -401,25 +402,51 @@
     </div>
   </div>
 
-  <!-- MODAL ĐIỀU CHUYỂN HÀNG LOẠT -->
+  <!-- MODAL NGHIỆP VỤ HÀNG LOẠT V5 -->
   <div id="bulkMovementModal" class="modal">
-    <div class="modal-card card">
-      <h3>Điều chuyển hàng loạt thiết bị</h3>
-      <p class="muted" id="bulkModalDesc">Áp dụng cho các thiết bị đã chọn</p>
-      <form onsubmit="handleSaveBulkMovement(event)" style="margin-top:1rem;">
-        <label>Loại giao dịch (*)</label>
-        <select id="bulkType" onchange="handleBulkTypeChange()">
-          <option value="Điều chuyển kho">Điều chuyển kho (chỉ tài sản từng chiếc)</option>
-        </select>
-        <label>Vị trí chuyển đến (*)</label>
-        <select id="bulkToLocation" required></select>
-        <label>Ghi chú / Lý do</label>
-        <input type="text" id="bulkNote" placeholder="VD: Chuyển phòng máy...">
-        <div class="modal-actions">
-          <button type="button" class="secondary" onclick="closeModal('bulkMovementModal')">Hủy</button>
-          <button type="submit" class="primary">Xác nhận</button>
-        </div>
-      </form>
+    <div class="modal-card card" style="max-width:900px;">
+      <h3>Chọn nhiều tài sản / tạo phiếu hàng loạt</h3>
+      <p class="muted" id="bulkModalDesc">Tìm theo mã, tên, serial, vị trí hoặc trạng thái. Có thể dán danh sách mã để chọn nhanh.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:12px 0;">
+        <div><label>Tìm nhanh</label><input id="bulkSearch" type="search" placeholder="Mã, tên, serial, vị trí..." oninput="renderBulkPicker()"></div>
+        <div><label>Loại giao dịch</label><select id="bulkType" onchange="handleBulkTypeChange()">
+          <option value="Điều chuyển kho">Điều chuyển kho</option>
+          <option value="Xuất kho sử dụng">Xuất kho sử dụng</option>
+          <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Đi bảo hành</option>
+          <option value="Thu hồi về kho">Thu hồi về kho</option>
+          <option value="Điều chuyển nơi sử dụng">Điều chuyển nơi sử dụng</option>
+          <option value="Chuyển sang sửa chữa">Chuyển sang sửa chữa</option>
+          <option value="Báo thanh lý">Báo thanh lý</option>
+        </select></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+        <button type="button" class="secondary" onclick="scanBulkAssetCode()">📷 Quét QR / mã thiết bị</button>
+        <button type="button" class="secondary" onclick="selectAllBulkFiltered(true)">Chọn tất cả kết quả</button>
+        <button type="button" class="secondary" onclick="selectAllBulkFiltered(false)">Bỏ chọn kết quả</button>
+        <button type="button" class="secondary" onclick="clearBulkSelection()">Bỏ chọn tất cả</button>
+      </div>
+      <div id="bulkPickerResults" style="max-height:260px;overflow:auto;border:1px solid var(--border-color,#dbe2ea);border-radius:8px;padding:6px;"></div>
+      <label style="margin-top:12px;">Dán danh sách mã tài sản (mỗi dòng hoặc dấu phẩy; mã phải tồn tại)</label>
+      <textarea id="bulkCodesPaste" rows="3" placeholder="SW-001
+SW-002
+CAM-003"></textarea>
+      <button type="button" class="secondary" onclick="addPastedBulkCodes()">Thêm các mã đã dán</button>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px;">
+        <div id="bulkWarehouseWrap"><label>Kho đích / kho nhận</label><select id="bulkToLocation"></select></div>
+        <div id="bulkUsageWrap" class="hidden"><label>Nơi sử dụng đích</label><select id="bulkUsageLocation"></select></div>
+        <div id="bulkDamageSourceWrap" class="hidden"><label>Hàng hỏng lấy từ</label><select id="bulkSourceMode"><option value="warehouse">Kho lưu trữ</option><option value="usage">Nơi sử dụng</option></select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px;">
+        <div><label>Đơn vị / bộ phận nhận</label><input type="text" id="bulkDepartment" placeholder="Phòng / đơn vị nhận"></div>
+        <div><label>Người giao / nhận</label><input type="text" id="bulkRecipient" placeholder="Tên người nhận hoặc phụ trách"></div>
+        <div><label>Số phiếu / công trình</label><input type="text" id="bulkReferenceNo" placeholder="VD: PX-2026-001"></div>
+      </div>
+      <label style="margin-top:10px;">Ghi chú / nguyên nhân chung</label><input type="text" id="bulkNote" placeholder="Mô tả nghiệp vụ hoặc sự cố...">
+      <div class="modal-actions">
+        <button type="button" class="secondary" onclick="closeModal('bulkMovementModal')">Hủy</button>
+        <button type="button" class="primary" onclick="handleSaveBulkMovement(event)">Xác nhận tạo phiếu cho các mã đã chọn</button>
+      </div>
+      <small class="muted">V5: tối đa 500 tài sản cá thể mỗi phiếu. Mặt hàng quản lý theo số lượng phải lập phiếu riêng và nhập số lượng cụ thể.</small>
     </div>
   </div>
 
