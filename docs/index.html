@@ -45,7 +45,10 @@
           <span class="icon">💻</span> <span>Thiết bị</span>
         </button>
         <button class="nav-btn" onclick="showView('locations')">
-          <span class="icon">🏢</span> <span>Vị trí & Kho</span>
+          <span class="icon">🏢</span> <span>Kho lưu trữ</span>
+        </button>
+        <button class="nav-btn" onclick="showView('usageLocations')">
+          <span class="icon">📍</span> <span>Nơi sử dụng</span>
         </button>
         <button class="nav-btn" onclick="showView('categories')">
           <span class="icon">📁</span> <span>Danh mục</span>
@@ -112,6 +115,14 @@
           <div id="dashboardLocations" class="stats-grid" style="margin-top:14px;"></div>
         </div>
         <div id="dashboardLocationDetail" class="card hidden" style="margin-top:12px; padding:16px;"></div>
+        <div class="card" style="margin-top:16px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div><h3 style="margin:0 0 5px;">📍 Tài sản/vật tư đang sử dụng</h3><div class="muted">Bấm vào địa điểm để xem chi tiết số lượng đã cấp hoặc đang lắp đặt.</div></div>
+            <button class="secondary" onclick="showView('usageLocations')">Quản lý nơi sử dụng</button>
+          </div>
+          <div id="dashboardUsageLocations" class="stats-grid" style="margin-top:14px;"></div>
+        </div>
+        <div id="dashboardUsageDetail" class="card hidden" style="margin-top:12px; padding:16px;"></div>
       </section>
 
       <!-- TAB 2: DANH SÁCH THIẾT BỊ -->
@@ -164,8 +175,8 @@
       <section id="locations" class="view hidden">
         <div class="toolbar">
           <div>
-            <h2>Danh bạ Vị trí & Kho lưu trữ</h2>
-            <p class="muted">Chuẩn hóa tên các kho và vị trí lắp đặt</p>
+            <h2>Danh mục kho lưu trữ</h2>
+            <p class="muted">Quản lý kho chứa hàng; địa điểm lắp đặt được quản lý riêng tại mục Nơi sử dụng.</p>
           </div>
           <button class="primary admin-only" onclick="openAddLocationModal()">+ Thêm Vị trí / Kho</button>
         </div>
@@ -180,6 +191,20 @@
               </tr>
             </thead>
             <tbody id="locationTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 3B: NƠI SỬ DỤNG -->
+      <section id="usageLocations" class="view hidden">
+        <div class="toolbar">
+          <div><h2>Danh mục nơi sử dụng</h2><p class="muted">Cơ sở, tòa nhà, tầng, phòng, công trình hoặc vị trí lắp đặt.</p></div>
+          <button class="primary admin-only" onclick="openUsageLocationModal()">+ Thêm nơi sử dụng</button>
+        </div>
+        <div class="card table-card">
+          <table class="table">
+            <thead><tr><th>STT</th><th>Tên nơi sử dụng</th><th>Đơn vị quản lý</th><th>Người phụ trách</th><th>Địa chỉ / Mô tả</th><th>Số lượng</th><th class="admin-only">Thao tác</th></tr></thead>
+            <tbody id="usageLocationTableBody"></tbody>
           </table>
         </div>
       </section>
@@ -326,7 +351,6 @@
         <label>Tình trạng</label>
         <select id="devStatus">
           <option value="Trong kho">Trong kho</option>
-          <option value="Đang sử dụng">Đang sử dụng</option>
           <option value="Hỏng / Bảo hành">Hỏng / Bảo hành</option>
           <option value="Thanh lý">Thanh lý</option>
         </select>
@@ -345,20 +369,30 @@
     <div class="modal-card card">
       <h3 id="movementModalTitle">Tạo phiếu điều chuyển / Báo sự cố</h3>
       <form onsubmit="handleSaveMovement(event)">
-        <label>Chọn thiết bị (*)</label>
+        <label>Chọn thiết bị / vật tư (*)</label>
         <select id="movDeviceCode" required onchange="handleSelectDeviceForMovement()"></select>
         <label>Loại giao dịch (*)</label>
         <select id="movType" onchange="handleMovementTypeChange()">
-          <option value="Xuất kho">Xuất kho sử dụng</option>
+          <option value="Xuất kho sử dụng">Xuất kho sử dụng</option>
+          <option value="Nhập kho">Nhập kho</option>
+          <option value="Điều chuyển kho">Điều chuyển giữa các kho</option>
+          <option value="Thu hồi về kho">Thu hồi từ nơi sử dụng về kho</option>
+          <option value="Điều chuyển nơi sử dụng">Điều chuyển giữa nơi sử dụng</option>
           <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Đi bảo hành</option>
           <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
-          <option value="Báo thanh lý">Báo thanh lý</option>
-          <option value="Điều chuyển">Điều chuyển vị trí</option>
+          <option value="Báo thanh lý">Thanh lý / loại khỏi sử dụng</option>
         </select>
-        <label>Vị trí chuyển đến (*)</label>
-        <select id="movToLocation" required></select>
+        <div id="movDamageSourceWrap" class="hidden"><label>Nguồn hàng cần xử lý</label><select id="movDamageSourceType" onchange="handleMovementTypeChange()"><option value="warehouse">Từ kho</option><option value="usage">Từ nơi sử dụng</option></select></div>
+        <div id="movFromWarehouseWrap"><label>Kho nguồn</label><select id="movFromLocation" onchange="handleMovementTypeChange()"></select><small id="movAvailableQty" class="muted"></small></div>
+        <div id="movFromUsageWrap" class="hidden"><label>Nơi sử dụng nguồn</label><select id="movFromUsageLocation" onchange="handleMovementTypeChange()"></select></div>
+        <div id="movToWarehouseWrap"><label>Kho nhận / kho đích</label><select id="movToLocation"></select></div>
+        <div id="movUsageWrap" class="hidden"><label>Nơi sử dụng đích (*)</label><select id="movUsageLocation" onchange="handleMovementTypeChange()"></select></div>
+        <div id="movQuantityWrap" class="hidden"><label>Số lượng giao dịch (*)</label><input type="number" id="movQuantity" min="0.001" step="any" inputmode="decimal" value="1"></div>
+        <label>Đơn vị / bộ phận nhận</label><input type="text" id="movDepartment" placeholder="VD: Phòng Công nghệ thông tin">
+        <label>Người giao / người nhận</label><input type="text" id="movRecipient" placeholder="Tên người nhận hoặc cán bộ phụ trách">
+        <label>Số phiếu / mã công trình (nếu có)</label><input type="text" id="movReferenceNo" placeholder="VD: PX-2026-001 / CT-ABC">
         <label>Ghi chú / Lý do</label>
-        <input type="text" id="movNote" placeholder="VD: Cháy nguồn, sửa chữa...">
+        <input type="text" id="movNote" placeholder="Mục đích xuất, nguồn nhập, lý do...">
         <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('movementModal')">Hủy</button>
           <button type="submit" class="primary">Xác nhận</button>
@@ -375,10 +409,7 @@
       <form onsubmit="handleSaveBulkMovement(event)" style="margin-top:1rem;">
         <label>Loại giao dịch (*)</label>
         <select id="bulkType" onchange="handleBulkTypeChange()">
-          <option value="Xuất kho">Xuất kho sử dụng</option>
-          <option value="Báo hỏng / Đi bảo hành">Báo hỏng / Đi bảo hành</option>
-          <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
-          <option value="Báo thanh lý">Báo thanh lý</option>
+          <option value="Điều chuyển kho">Điều chuyển kho (chỉ tài sản từng chiếc)</option>
         </select>
         <label>Vị trí chuyển đến (*)</label>
         <select id="bulkToLocation" required></select>
@@ -388,6 +419,21 @@
           <button type="button" class="secondary" onclick="closeModal('bulkMovementModal')">Hủy</button>
           <button type="submit" class="primary">Xác nhận</button>
         </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL THÊM/SỬA NƠI SỬ DỤNG -->
+  <div id="usageLocationModal" class="modal">
+    <div class="modal-card card">
+      <h3 id="usageLocationModalTitle">Thêm nơi sử dụng</h3>
+      <form onsubmit="saveUsageLocation(event)">
+        <input type="hidden" id="usageLocationId"><input type="hidden" id="usageLocationOldName">
+        <label>Tên nơi sử dụng (*)</label><input id="usageLocationName" required placeholder="VD: Cơ sở A - Tòa nhà A1 - Phòng 201">
+        <label>Đơn vị quản lý</label><input id="usageLocationDepartment" placeholder="VD: Phòng Công nghệ thông tin">
+        <label>Người phụ trách</label><input id="usageLocationManager" placeholder="Tên người phụ trách">
+        <label>Địa chỉ / Mô tả</label><input id="usageLocationAddress" placeholder="Tòa nhà, tầng, phòng, công trình...">
+        <div class="modal-actions"><button type="button" class="secondary" onclick="closeModal('usageLocationModal')">Hủy</button><button type="submit" class="primary">Lưu nơi sử dụng</button></div>
       </form>
     </div>
   </div>
