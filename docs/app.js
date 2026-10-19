@@ -880,7 +880,7 @@ function renderBulkPicker() {
 }
 function updateBulkPickerCount() {
   const desc = document.getElementById("bulkModalDesc");
-  if (desc) desc.innerText = `Đã chọn ${selectedCodes.size} tài sản cá thể. Mỗi phiếu tối đa 500 mã.`;
+  if (desc) desc.innerText = `Đã chọn ${selectedCodes.size} tài sản có mã riêng. Mỗi phiếu tối đa 500 mã; có thể chọn từ menu Xuất / Nhập / Sự cố, tìm kiếm, dán mã hoặc quét QR.`;
 }
 function selectAllBulkFiltered(checked) {
   getBulkFilteredDevices().slice(0,500).forEach(d => checked ? selectedCodes.add(d.code) : selectedCodes.delete(d.code));
@@ -903,7 +903,7 @@ function handleBulkTypeChange() {
   const warehouseWrap = document.getElementById("bulkWarehouseWrap");
   const usageWrap = document.getElementById("bulkUsageWrap");
   const damageWrap = document.getElementById("bulkDamageSourceWrap");
-  const needsWarehouse = ["Điều chuyển kho", "Báo hỏng / Đi bảo hành", "Thu hồi về kho", "Chuyển sang sửa chữa"].includes(type);
+  const needsWarehouse = ["Nhập kho", "Điều chuyển kho", "Báo hỏng / Đi bảo hành", "Thu hồi về kho", "Chuyển sang sửa chữa"].includes(type);
   const needsUsage = ["Xuất kho sử dụng", "Điều chuyển nơi sử dụng"].includes(type);
   if (warehouseWrap) warehouseWrap.classList.toggle("hidden", !needsWarehouse);
   if (usageWrap) usageWrap.classList.toggle("hidden", !needsUsage);
