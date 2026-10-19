@@ -78,6 +78,8 @@ document.addEventListener("click", (e) => {
     openUsageLocationModal(val);
   } else if (act === "del-usage-loc") {
     deleteUsageLocation(val);
+  } else if (act === "cancel-movement") {
+    cancelMovement(val);
   } else if (act === "dashboard-location-close") {
     const detail = document.getElementById("dashboardLocationDetail");
     if (detail) { detail.classList.add("hidden"); detail.innerHTML = ""; }
@@ -737,17 +739,58 @@ async function handleSaveMovement(e) {
 function renderMovements() {
   const tbody = document.getElementById("movementTableBody");
   if (!tbody) return;
-  tbody.innerHTML = STATE.movements.map(m => `
-    <tr>
+  const isAdmin = STATE.currentUser?.role === "admin";
+  tbody.innerHTML = STATE.movements.map(m => {
+    const isCancelled = Boolean(m.cancelled || m.cancelledAt);
+    const canCancel = isAdmin && !isCancelled && Boolean(m.id && m.deviceBefore && m.deviceAfter && m.deviceCode);
+    const stateBadge = isCancelled
+      ? `<div><span class="badge badge-danger">ĐÃ HỦY</span><small style="display:block;margin-top:4px;">${escapeHtml(m.cancelledBy || "-")} · ${m.cancelledAt ? new Date(m.cancelledAt).toLocaleString("vi-VN") : ""}</small><small style="display:block;">${escapeHtml(m.cancelReason || "")}</small></div>`
+      : `<span class="badge ${m.type && (m.type.includes('hỏng') || m.type.includes('thanh lý')) ? 'badge-danger' : 'badge-secondary'}">${escapeHtml(m.type || "Giao dịch")}</span>`;
+    return `
+    <tr style="${isCancelled ? "opacity:.72;background:#f8fafc;" : ""}">
       <td>${m.createdAt ? new Date(m.createdAt).toLocaleString("vi-VN") : "-"}</td>
-      <td><b>${m.deviceCode}</b></td>
-      <td><span class="badge ${m.type.includes('hỏng') || m.type.includes('thanh lý') ? 'badge-danger' : 'badge-secondary'}">${m.type}</span></td>
+      <td><b>${escapeHtml(m.deviceCode || "-")}</b>${m.batchId ? `<small style="display:block;color:#64748b;">${escapeHtml(m.batchId)}</small>` : ""}</td>
+      <td>${stateBadge}${isCancelled ? `<small style="display:block;text-decoration:line-through;color:#64748b;margin-top:3px;">${escapeHtml(m.type || "Giao dịch")}</small>` : ""}</td>
       <td>${escapeHtml(m.fromLocation || m.fromUsageLocation || "-")}</td>
       <td><b>${escapeHtml(m.toLocation || m.usageLocation || "-")}</b></td>
       <td><small>${Number(m.quantity || 1).toLocaleString("vi-VN")} ${escapeHtml(m.unit || "cái")}${m.department ? ` · ${escapeHtml(m.department)}` : ""}${m.recipient ? ` · Người nhận: ${escapeHtml(m.recipient)}` : ""}${m.referenceNo ? ` · Phiếu: ${escapeHtml(m.referenceNo)}` : ""}${m.note ? ` · ${escapeHtml(m.note)}` : ""}</small></td>
-      <td>${m.createdBy || "-"}</td>
-    </tr>
-  `).join("");
+      <td>${escapeHtml(m.createdBy || "-")}</td>
+      ${isAdmin ? `<td>${canCancel ? `<button type="button" class="danger" data-act="cancel-movement" data-val="${escapeAttr(m.id)}" style="color:#b91c1c;">Hủy & hoàn tác</button>` : isCancelled ? `<span class="muted">Đã hủy</span>` : `<button type="button" disabled title="Phiếu cũ thiếu ảnh chụp dữ liệu trước/sau, không thể hoàn tác an toàn">Không thể hoàn tác</button>`}</td>` : ""}
+    </tr>`;
+  }).join("");
+  const table = tbody.closest("table");
+  const headRow = table?.querySelector("thead tr");
+  if (headRow) {
+    const hasAction = headRow.querySelector('[data-movement-action-header="1"]');
+    if (isAdmin && !hasAction) headRow.insertAdjacentHTML("beforeend", '<th class="admin-only" data-movement-action-header="1">Thao tác</th>');
+    if (!isAdmin && hasAction) hasAction.remove();
+  }
+}
+
+async function cancelMovement(id) {
+  if (!id) return alert("Phiếu này thiếu mã định danh nên không thể hủy an toàn.");
+  const record = STATE.movements.find(m => String(m.id) === String(id));
+  if (!record) return alert("Không tìm thấy phiếu. Hãy tải lại trang.");
+  if (record.cancelled || record.cancelledAt) return alert("Phiếu này đã được hủy.");
+  if (!record.deviceBefore || !record.deviceAfter) return alert("Phiếu cũ không có dữ liệu trước/sau giao dịch. Không thể hoàn tác an toàn.");
+  const scope = record.batchId ? `Toàn bộ phiếu hàng loạt ${record.batchId}` : `Phiếu ${record.id}`;
+  const reason = prompt(`${scope}
+${record.type || "Giao dịch"} · ${record.deviceCode || "Không rõ mã"}
+
+Nhập lý do hủy (bắt buộc):`, "Tạo nhầm phiếu trong giai đoạn thử nghiệm");
+  if (reason === null) return;
+  if (reason.trim().length < 3) return alert("Lý do hủy phải có ít nhất 3 ký tự.");
+  if (!confirm(`XÁC NHẬN HỦY VÀ HOÀN TÁC?
+
+${scope}
+${record.type || "Giao dịch"}
+
+Hệ thống sẽ kiểm tra toàn bộ tài sản trước khi thay đổi. Nếu có giao dịch tiếp theo hoặc dữ liệu không khớp, toàn bộ thao tác sẽ bị từ chối. Nhật ký sẽ được giữ lại và đánh dấu ĐÃ HỦY.`)) return;
+  try {
+    await callMutate("movement.cancel", { id, reason: reason.trim() });
+    await loadState();
+    alert("Đã hủy phiếu và hoàn tác dữ liệu. Lịch sử được giữ lại.");
+  } catch (e) { /* API hiển thị lỗi */ }
 }
 
 // ----------------------------------------------------
