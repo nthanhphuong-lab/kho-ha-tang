@@ -420,3 +420,10 @@ input,select { min-height:38px; }
 
 /* V5.2.7: illustrated operations guide */
 .guide-section-title{margin:26px 2px 12px}.guide-section-title h2{margin:0 0 4px;font-size:1.18rem}.guide-section-title p{margin:0}.guide-mock-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:10px}.guide-mock-stats span{display:flex;flex-direction:column;gap:6px;padding:10px 8px;background:#fff;border:1px solid #dbe3ee;border-radius:8px}.guide-mock-stats b{font-size:.68rem;color:#64748b}.guide-mock-stats strong{font-size:1.2rem;color:#2454d9}.guide-card .mock-fields i{min-width:0;overflow-wrap:anywhere}.guide-card .mock-flow{justify-content:center}.guide-card .mock-flow b{font-size:1rem}@media(max-width:480px){.guide-mock-stats{grid-template-columns:1fr}.guide-mock-stats span{flex-direction:row;align-items:center;justify-content:space-between}.guide-card .mock-flow{gap:5px}.guide-card .mock-flow span{padding:8px 6px;font-size:.7rem}}
+
+
+/* Liên kết xem chi tiết kho/danh mục/nơi sử dụng */
+.link-button { border:0; background:transparent; color:var(--primary, #2563eb); padding:3px 0; font:inherit; text-align:left; cursor:pointer; }
+.link-button:hover { text-decoration:underline; }
+.link-button:focus-visible { outline:2px solid var(--primary, #2563eb); outline-offset:3px; border-radius:3px; }
+#warehouseInventoryDetail, #usageInventoryDetail, #categoryInventoryDetail { scroll-margin-top:16px; }
