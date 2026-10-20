@@ -51,7 +51,13 @@ document.addEventListener("click", (e) => {
   const act = btn.getAttribute("data-act");
   const val = btn.getAttribute("data-val") || "";
 
-  if (act === "edit-dev") {
+  if (act === "entity-inventory") {
+    openEntityInventory(btn.getAttribute("data-type") || "", val);
+  } else if (act === "entity-inventory-export") {
+    exportEntityInventory();
+  } else if (act === "entity-inventory-close") {
+    closeEntityInventory();
+  } else if (act === "edit-dev") {
     openDeviceModal(val);
   } else if (act === "quick-mov") {
     openMovementModal(val);
@@ -89,6 +95,18 @@ document.addEventListener("click", (e) => {
 });
 
 // LẮNG NGHE SỰ KIỆN CHỌN CHECKBOX THIẾT BỊ
+document.addEventListener("input", (e) => {
+  if (e.target && e.target.id === "entityInventorySearch") renderEntityInventoryRows();
+  if (e.target && e.target.id === "stocktakeSearch") renderStocktake();
+  if (e.target && e.target.matches("[data-stocktake-code]")) {
+    const code=e.target.getAttribute("data-stocktake-code");
+    if (e.target.hasAttribute("data-stocktake-qty")) setStocktakeCount(code, e.target.value, false);
+    if (e.target.hasAttribute("data-stocktake-note")) setStocktakeNote(code, e.target.value, false);
+    updateStocktakeSummary();
+  }
+});
+document.addEventListener("change", (e) => { if (e.target && e.target.matches("[data-stocktake-qty]")) renderStocktake(); });
+
 document.addEventListener("change", (e) => {
   const chk = e.target.closest("input.dev-check");
   if (chk) toggleSelectDevice(chk.value, chk.checked);
@@ -328,6 +346,7 @@ async function loadState() {
     renderLocations();
     renderUsageLocations();
     renderCustodyReport();
+  renderStocktake();
 
     if (statusEl) statusEl.innerText = "Đã đồng bộ";
   } catch (err) {
@@ -691,11 +710,12 @@ function renderDevices() {
         <td><b>${locationText}</b></td>
         <td><b>${d.trackingMode === "quantity" ? Number(d.quantity || 0).toLocaleString("vi-VN") : "1"} ${unitText}</b></td>
         <td><span class="badge ${statusClass}">${escapeHtml(status)}</span></td>
-        ${isAdmin ? `<td class="device-actions">
-          <button type="button" data-act="quick-mov" data-val="${codeAttr}">Chuyển / Sự cố</button>
+        <td class="device-actions">
+          <button type="button" class="secondary" data-act="device-history" data-val="${codeAttr}">Lịch sử</button>
+          ${isAdmin ? `<button type="button" data-act="quick-mov" data-val="${codeAttr}">Chuyển / Sự cố</button>
           <button type="button" data-act="edit-dev" data-val="${codeAttr}">Sửa</button>
-          <button type="button" class="danger-text" data-act="del-dev" data-val="${codeAttr}">Xóa</button>
-        </td>` : "<td></td>"}
+          <button type="button" class="danger-text" data-act="del-dev" data-val="${codeAttr}">Xóa</button>` : ""}
+        </td>
       </tr>`;
   }).join("") || `<tr><td colspan="10" class="muted empty-state">Không tìm thấy tài sản/vật tư phù hợp. Hãy thử bỏ bớt bộ lọc hoặc tìm theo mã quản lý.</td></tr>`;
   applyTablePagination("deviceTableBody", "devices");
@@ -1150,6 +1170,54 @@ function exportDispositionCSV() {
 }
 
 // ----------------------------------------------------
+// XEM CHI TIẾT TÀI SẢN THEO KHO / DANH MỤC / NƠI SỬ DỤNG
+// ----------------------------------------------------
+let entityInventoryState = { type: "", key: "", rows: [] };
+function entityInventoryContainer(type) {
+  return document.getElementById(type === "warehouse" ? "warehouseInventoryDetail" : type === "usage" ? "usageInventoryDetail" : "categoryInventoryDetail");
+}
+function entityInventoryQuantity(device, type, key) {
+  if (type === "warehouse") return getWarehouseQuantityAtLocation(device, key);
+  if (type === "usage") return getDeviceUsageAtLocation(device, key);
+  if (device.trackingMode === "quantity") return Math.max(0, sumQtyMap(device.stockByLocation) + sumQtyMap(device.usageByLocation) + sumQtyMap(device.damagedByLocation) + sumQtyMap(device.usageDamagedByLocation) + sumQtyMap(device.repairByLocation) + sumQtyMap(device.usageRepairByLocation) + sumQtyMap(device.disposedByLocation));
+  return Number(device.quantity) > 0 ? Number(device.quantity) : 1;
+}
+function openEntityInventory(type, key) {
+  if (!["warehouse", "usage", "category"].includes(type)) return;
+  entityInventoryState = { type, key, rows: [] };
+  ["warehouse", "usage", "category"].forEach(t => { const el = entityInventoryContainer(t); if (el) { el.classList.add("hidden"); el.innerHTML = ""; } });
+  const el = entityInventoryContainer(type); if (!el) return;
+  const title = type === "warehouse" ? "Kho lưu trữ" : type === "usage" ? "Nơi sử dụng" : "Danh mục thiết bị";
+  el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap"><div><h3 style="margin:0 0 5px">${title}: ${escapeHtml(key)}</h3><p class="muted" style="margin:0">Danh sách tài sản/vật tư được ghi nhận trong mục này. Số lượng được tính theo trạng thái và vị trí tương ứng.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="primary" data-act="entity-inventory-export">Xuất báo cáo CSV</button><button type="button" class="secondary" data-act="entity-inventory-close">Đóng</button></div></div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0"><input id="entityInventorySearch" type="search" placeholder="Tìm mã, tên, model, serial..." style="max-width:360px;flex:1"><span id="entityInventoryCount" class="muted"></span></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>STT</th><th>Mã quản lý</th><th>Tên thiết bị/vật tư</th><th>Danh mục</th><th>Model / Serial</th><th>Số lượng tại mục</th><th>Đơn vị</th><th>Tình trạng</th></tr></thead><tbody id="entityInventoryRows"></tbody></table></div>`;
+  el.classList.remove("hidden");
+  const devices = (STATE.devices || []).filter(d => {
+    const qty = entityInventoryQuantity(d, type, key);
+    return type === "category" ? String(d.category || "").trim().toLowerCase() === String(key).trim().toLowerCase() : qty > 0;
+  });
+  entityInventoryState.rows = devices.map(d => ({ device:d, quantity: entityInventoryQuantity(d,type,key) }));
+  renderEntityInventoryRows();
+  el.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function renderEntityInventoryRows() {
+  const body = document.getElementById("entityInventoryRows"); if (!body) return;
+  const q = String(document.getElementById("entityInventorySearch")?.value || "").trim().toLowerCase();
+  const rows = entityInventoryState.rows.filter(({device:d}) => !q || [d.code,d.name,d.model,d.serial,d.category,d.notes].some(v => String(v || "").toLowerCase().includes(q)));
+  body.innerHTML = rows.map(({device:d,quantity},i) => `<tr><td>${i+1}</td><td><b>${escapeHtml(d.code || "—")}</b></td><td>${escapeHtml(d.name || d.code || "—")}</td><td>${escapeHtml(d.category || "—")}</td><td>${escapeHtml([d.model,d.serial].filter(Boolean).join(" / ") || "—")}</td><td>${Number(quantity || 0).toLocaleString("vi-VN")}</td><td>${escapeHtml(d.unit || "cái")}</td><td>${escapeHtml(displayDeviceStatus(d))}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">Không có thiết bị phù hợp với điều kiện tìm kiếm.</td></tr>`;
+  const count = document.getElementById("entityInventoryCount"); if (count) count.textContent = `${rows.length} / ${entityInventoryState.rows.length} mã · Tổng số lượng: ${rows.reduce((s,r)=>s+Number(r.quantity||0),0).toLocaleString("vi-VN")}`;
+}
+function exportEntityInventory() {
+  const q = String(document.getElementById("entityInventorySearch")?.value || "").trim().toLowerCase();
+  const rows = entityInventoryState.rows.filter(({device:d}) => !q || [d.code,d.name,d.model,d.serial,d.category,d.notes].some(v => String(v || "").toLowerCase().includes(q)));
+  const typeName = entityInventoryState.type === "warehouse" ? "Kho lưu trữ" : entityInventoryState.type === "usage" ? "Nơi sử dụng" : "Danh mục";
+  const data = [["Loại báo cáo",typeName],["Tên mục",entityInventoryState.key],["Ngày xuất",new Date().toLocaleString("vi-VN")],[],["Mã quản lý","Tên tài sản/vật tư","Danh mục","Model","Serial/MAC","Số lượng tại mục","Đơn vị tính","Tình trạng","Ghi chú"], ...rows.map(({device:d,quantity})=>[d.code||"",d.name||"",d.category||"",d.model||"",d.serial||"",quantity,d.unit||"cái",displayDeviceStatus(d),d.notes||""])];
+  downloadCSV(`bao_cao_${entityInventoryState.type}_${new Date().toISOString().slice(0,10)}.csv`,data);
+}
+function closeEntityInventory() {
+  ["warehouse","usage","category"].forEach(t=>{const el=entityInventoryContainer(t);if(el){el.classList.add("hidden");el.innerHTML="";}});
+  entityInventoryState={type:"",key:"",rows:[]};
+}
+
+// ----------------------------------------------------
 // VỊ TRÍ & KHO (LOCATIONS)
 // ----------------------------------------------------
 function renderLocations() {
@@ -1157,7 +1225,7 @@ function renderLocations() {
   const isAdmin = STATE.currentUser?.role === "admin";
   tbody.innerHTML = STATE.locations.map((loc, idx) => {
     const count = STATE.devices.reduce((sum, d) => sum + (d.trackingMode === "quantity" ? Number((d.stockByLocation || {})[loc] || 0) + Number((d.damagedByLocation || {})[loc] || 0) + Number((d.repairByLocation || {})[loc] || 0) + Number((d.disposedByLocation || {})[loc] || 0) : (d.status !== "Đang sử dụng" && d.location === loc ? 1 : 0)), 0);
-    return `<tr><td>${idx + 1}</td><td><b>${escapeHtml(loc)}</b></td><td><span class="badge badge-secondary">${count.toLocaleString("vi-VN")} đơn vị</span></td>${isAdmin ? `<td style="text-align:right;"><button type="button" data-act="rename-loc" data-val="${escapeAttr(loc)}">Đổi tên</button> <button type="button" data-act="del-loc" data-val="${escapeAttr(loc)}" style="color:red">Xóa</button></td>` : `<td></td>`}</tr>`;
+    return `<tr><td>${idx + 1}</td><td><button type="button" class="link-button" data-act="entity-inventory" data-type="warehouse" data-val="${escapeAttr(loc)}" title="Xem danh sách thiết bị trong kho"><b>${escapeHtml(loc)}</b> ↗</button></td><td><span class="badge badge-secondary">${count.toLocaleString("vi-VN")} đơn vị</span></td>${isAdmin ? `<td style="text-align:right;"><button type="button" data-act="rename-loc" data-val="${escapeAttr(loc)}">Đổi tên</button> <button type="button" data-act="del-loc" data-val="${escapeAttr(loc)}" style="color:red">Xóa</button></td>` : `<td></td>`}</tr>`;
   }).join("");
   applyTablePagination("locationTableBody", "locations");
 }
@@ -1167,7 +1235,7 @@ async function deleteLocation(name) { if (!confirm(`Bạn có chắc muốn xóa
 function renderUsageLocations() {
   const tbody = document.getElementById("usageLocationTableBody"); if (!tbody) return;
   const isAdmin = STATE.currentUser?.role === "admin";
-  tbody.innerHTML = STATE.usageLocations.map((l, idx) => { const name = l.name || l; const qty = STATE.devices.reduce((sum,d) => sum + getDeviceUsageAtLocation(d,name),0); return `<tr><td>${idx+1}</td><td><b>${escapeHtml(name)}</b></td><td>${escapeHtml(l.department || "-")}</td><td>${escapeHtml(l.manager || "-")}</td><td>${escapeHtml(l.address || "-")}</td><td><span class="badge badge-secondary">${qty.toLocaleString("vi-VN")}</span></td><td>${isAdmin ? (l.legacy ? `<button type="button" data-act="edit-usage-loc" data-val="${escapeAttr(name)}">Khai báo</button>` : `<button type="button" data-act="edit-usage-loc" data-val="${escapeAttr(l.id || name)}">Sửa</button> <button type="button" data-act="del-usage-loc" data-val="${escapeAttr(l.id || name)}" style="color:#b91c1c">Xóa</button>`) : (l.legacy ? `<span class="badge badge-danger">Chưa chuẩn hóa</span>` : "")}</td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">Chưa có nơi sử dụng.</td></tr>`;
+  tbody.innerHTML = STATE.usageLocations.map((l, idx) => { const name = l.name || l; const qty = STATE.devices.reduce((sum,d) => sum + getDeviceUsageAtLocation(d,name),0); return `<tr><td>${idx+1}</td><td><button type="button" class="link-button" data-act="entity-inventory" data-type="usage" data-val="${escapeAttr(name)}" title="Xem thiết bị tại nơi sử dụng"><b>${escapeHtml(name)}</b> ↗</button></td><td>${escapeHtml(l.department || "-")}</td><td>${escapeHtml(l.manager || "-")}</td><td>${escapeHtml(l.address || "-")}</td><td><span class="badge badge-secondary">${qty.toLocaleString("vi-VN")}</span></td><td>${isAdmin ? (l.legacy ? `<button type="button" data-act="edit-usage-loc" data-val="${escapeAttr(name)}">Khai báo</button>` : `<button type="button" data-act="edit-usage-loc" data-val="${escapeAttr(l.id || name)}">Sửa</button> <button type="button" data-act="del-usage-loc" data-val="${escapeAttr(l.id || name)}" style="color:#b91c1c">Xóa</button>`) : (l.legacy ? `<span class="badge badge-danger">Chưa chuẩn hóa</span>` : "")}</td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">Chưa có nơi sử dụng.</td></tr>`;
   applyTablePagination("usageLocationTableBody", "usageLocations");
 }
 function openUsageLocationModal(idOrName = null) {
@@ -1192,8 +1260,8 @@ function renderCategories() {
     return `
       <tr>
         <td>${idx + 1}</td>
-        <td><b>${cat}</b></td>
-        <td><b>${unitForCategory(cat)}</b></td>
+        <td><button type="button" class="link-button" data-act="entity-inventory" data-type="category" data-val="${escapeAttr(cat)}" title="Xem thiết bị thuộc danh mục này"><b>${escapeHtml(cat)}</b> ↗</button></td>
+        <td><b>${escapeHtml(unitForCategory(cat))}</b></td>
         <td><span class="badge badge-secondary">${count} thiết bị</span></td>
         ${isAdmin ? `
           <td style="text-align:right;">
@@ -1695,6 +1763,60 @@ function refreshCustodyReportFilters(rows) {
   };
   update("custodyDepartmentFilter", "department", "Tất cả đơn vị/phòng ban");
   update("custodyHolderFilter", "holder", "Tất cả người giữ/phụ trách");
+}
+
+// ----------------------------------------------------
+// LỊCH SỬ THEO TỪNG TÀI SẢN + KIỂM KÊ THỰC TẾ
+// ----------------------------------------------------
+const stocktakeDraft = (() => { try { return JSON.parse(localStorage.getItem("khoStocktakeDraftV529") || "{}"); } catch (_) { return Object.create(null); } })();
+function persistStocktakeDraft() { try { localStorage.setItem("khoStocktakeDraftV529", JSON.stringify(stocktakeDraft)); } catch (_) {} }
+function currentBookQuantity(d) {
+  if (d.trackingMode !== "quantity") return /Thanh lý/i.test(d.status || "") ? 0 : 1;
+  return Math.max(0, sumQtyMap(d.stockByLocation) + sumQtyMap(d.usageByLocation) + sumQtyMap(d.damagedByLocation) + sumQtyMap(d.usageDamagedByLocation) + sumQtyMap(d.repairByLocation) + sumQtyMap(d.usageRepairByLocation));
+}
+function openDeviceHistory(code) {
+  const d=(STATE.devices||[]).find(x=>String(x.code)===String(code));
+  const panel=document.getElementById("deviceHistoryPanel"); if(!panel) return;
+  if(!d) { alert("Không tìm thấy tài sản/vật tư."); return; }
+  const rows=(STATE.movements||[]).filter(m=>String(m.deviceCode||"").toLowerCase()===String(code).toLowerCase()).sort((a,b)=>new Date(a.createdAt||0)-new Date(b.createdAt||0));
+  panel.innerHTML=`<div class="toolbar"><div><h2>Lịch sử tài sản: ${escapeHtml(d.code||code)} — ${escapeHtml(d.name||"")}</h2><p class="muted">Danh mục: ${escapeHtml(d.category||"—")} · Tình trạng hiện tại: ${escapeHtml(displayDeviceStatus(d))} · Số lượng hiện tại: ${currentBookQuantity(d).toLocaleString("vi-VN")} ${escapeHtml(d.unit||"cái")}</p></div><button type="button" class="secondary" data-act="device-history-close">Đóng</button></div>
+  <div class="table-card"><table class="table"><thead><tr><th>Thời gian</th><th>Nghiệp vụ</th><th>Từ vị trí</th><th>Đến vị trí</th><th>Số lượng</th><th>Người nhận / đơn vị</th><th>Người thực hiện</th><th>Trạng thái</th><th>Ghi chú / phiếu</th></tr></thead><tbody>${rows.map(m=>`<tr><td>${m.createdAt?new Date(m.createdAt).toLocaleString("vi-VN"):"—"}</td><td>${escapeHtml(m.type||"Giao dịch")}</td><td>${escapeHtml(m.fromLocation||m.fromUsageLocation||"—")}</td><td>${escapeHtml(m.toLocation||m.usageLocation||"—")}</td><td>${Number(m.quantity||1).toLocaleString("vi-VN")} ${escapeHtml(m.unit||d.unit||"cái")}</td><td>${escapeHtml([m.recipient,m.department].filter(Boolean).join(" · ")||"—")}</td><td>${escapeHtml(m.createdBy||"—")}</td><td>${m.cancelled||m.cancelledAt?"Đã hủy":"Có hiệu lực"}</td><td>${escapeHtml([m.referenceNo,m.note,m.cancelReason].filter(Boolean).join(" · ")||"—")}</td></tr>`).join("")||`<tr><td colspan="9" class="muted">Chưa có lịch sử giao dịch được ghi nhận cho mã này.</td></tr>`}</tbody></table></div>`;
+  panel.classList.remove("hidden"); panel.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function setStocktakeCount(code, value, rerender=true) {
+  stocktakeDraft[code]=stocktakeDraft[code]||{};
+  if(value==="" || value===null || value===undefined) delete stocktakeDraft[code].actual;
+  else { const n=Number(value); if(Number.isFinite(n)&&n>=0) stocktakeDraft[code].actual=n; }
+  if(!Object.keys(stocktakeDraft[code]).length) delete stocktakeDraft[code];
+  persistStocktakeDraft();
+  if(rerender) renderStocktake();
+}
+function setStocktakeNote(code, value, rerender=true) {
+  stocktakeDraft[code]=stocktakeDraft[code]||{}; stocktakeDraft[code].note=String(value||"");
+  persistStocktakeDraft();
+  if(rerender) renderStocktake();
+}
+function renderStocktake() {
+  const body=document.getElementById("stocktakeBody"); if(!body) return;
+  const q=String(document.getElementById("stocktakeSearch")?.value||"").trim().toLowerCase();
+  const mode=document.getElementById("stocktakeDiffFilter")?.value||"all";
+  const rows=(STATE.devices||[]).map(d=>({d,expected:currentBookQuantity(d),draft:stocktakeDraft[d.code]||{}})).filter(r=>!q||[r.d.code,r.d.name,r.d.category,r.d.model,r.d.serial,r.d.location,r.d.usageLocation].some(v=>String(v||"").toLowerCase().includes(q))).filter(r=>mode==="missing"?r.draft.actual===undefined:mode==="diff"?r.draft.actual!==undefined&&Number(r.draft.actual)!==r.expected:true);
+  body.innerHTML=rows.map(({d,expected,draft})=>{const actual=draft.actual;const diff=actual===undefined?null:Number(actual)-expected;const loc=d.trackingMode==="quantity"?[...Object.entries(d.stockByLocation||{}).filter(([,n])=>Number(n)>0).map(([k])=>k),...Object.entries(d.usageByLocation||{}).filter(([,n])=>Number(n)>0).map(([k])=>k)].join(", "):d.usageLocation||d.location||"—";return `<tr><td><b>${escapeHtml(d.code||"")}</b></td><td>${escapeHtml(d.name||d.code||"")}<small class="muted" style="display:block">${escapeHtml(d.category||"")}</small></td><td>${escapeHtml(loc||"—")}</td><td>${expected.toLocaleString("vi-VN")} ${escapeHtml(d.unit||"cái")}</td><td><input type="number" min="0" step="any" data-stocktake-code="${escapeAttr(d.code)}" data-stocktake-qty value="${actual===undefined?"":escapeAttr(actual)}" placeholder="Nhập thực tế" style="width:130px"></td><td>${diff===null?"Chưa kiểm":`<b style="color:${diff===0?'#15803d':'#b91c1c'}">${diff>0?'+':''}${diff.toLocaleString("vi-VN")}</b>`}</td><td><input type="text" data-stocktake-code="${escapeAttr(d.code)}" data-stocktake-note value="${escapeAttr(draft.note||"")}" placeholder="Ghi chú" style="min-width:150px"></td></tr>`;}).join("")||`<tr><td colspan="7" class="muted">Không có tài sản phù hợp.</td></tr>`;
+  updateStocktakeSummary();
+}
+function updateStocktakeSummary() {
+  const el=document.getElementById("stocktakeSummary"); if(!el) return;
+  const all=STATE.devices||[]; const counted=all.filter(d=>stocktakeDraft[d.code]?.actual!==undefined); const diffs=counted.filter(d=>Number(stocktakeDraft[d.code].actual)!==currentBookQuantity(d));
+  el.textContent=`Đã kiểm ${counted.length}/${all.length} mã · Chênh lệch ${diffs.length} mã`;
+}
+function resetStocktake() {
+  if(!confirm("Xóa toàn bộ số lượng kiểm đếm và ghi chú của phiên kiểm kê trên trình duyệt này? Dữ liệu tồn kho hệ thống không bị thay đổi.")) return;
+  Object.keys(stocktakeDraft).forEach(k=>delete stocktakeDraft[k]); persistStocktakeDraft(); renderStocktake();
+}
+function exportStocktakeCSV() {
+  const rows=(STATE.devices||[]).map(d=>{const draft=stocktakeDraft[d.code]||{};const expected=currentBookQuantity(d);const actual=draft.actual;return {d,expected,actual,diff:actual===undefined?"":Number(actual)-expected,note:draft.note||""};});
+  const data=[["Biên bản kiểm kê","Quản lý tài sản/vật tư"],["Ngày xuất",new Date().toLocaleString("vi-VN")],[],["Mã","Tên","Danh mục","Vị trí","Số lượng hệ thống","Số lượng thực tế","Chênh lệch","Đơn vị","Ghi chú","Trạng thái kiểm kê"],...rows.map(({d,expected,actual,diff,note})=>[d.code||"",d.name||"",d.category||"",d.usageLocation||d.location||"",expected,actual===undefined?"":actual,diff,d.unit||"cái",note,actual===undefined?"Chưa kiểm":Number(diff)===0?"Khớp":"Chênh lệch"] )];
+  downloadCSV(`bien_ban_kiem_ke_${new Date().toISOString().slice(0,10)}.csv`,data);
 }
 
 function renderCustodyReport() {
