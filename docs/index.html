@@ -230,7 +230,7 @@
                 <th>Vị trí / Kho</th>
                 <th>Số lượng</th>
                 <th>Tình trạng</th>
-                <th class="admin-only" style="text-align:right;">Thao tác nhanh</th>
+                <th style="text-align:right;">Thao tác</th>
               </tr>
             </thead>
             <tbody id="deviceTableBody"></tbody>
@@ -260,6 +260,7 @@
             <tbody id="locationTableBody"></tbody>
           </table>
         </div>
+        <div id="warehouseInventoryDetail" class="card hidden" style="margin-top:14px;"></div>
       </section>
 
       <!-- TAB 3B: NƠI SỬ DỤNG -->
@@ -274,6 +275,7 @@
             <tbody id="usageLocationTableBody"></tbody>
           </table>
         </div>
+        <div id="usageInventoryDetail" class="card hidden" style="margin-top:14px;"></div>
       </section>
 
       <!-- TAB 4: DANH MỤC -->
@@ -299,6 +301,7 @@
             <tbody id="categoryTableBody"></tbody>
           </table>
         </div>
+        <div id="categoryInventoryDetail" class="card hidden" style="margin-top:14px;"></div>
       </section>
 
       <!-- TAB 5: XUẤT NHẬP & SỰ CỐ -->
@@ -434,6 +437,12 @@
           </div>
         </div>
         <p class="muted report-data-note">Lưu ý: Người đang giữ được xác định từ giao dịch cấp phát/chuyển nơi sử dụng gần nhất còn hiệu lực; nếu dữ liệu cũ chưa ghi người nhận, báo cáo hiển thị “Chưa xác định”. Người phụ trách lấy từ khai báo Nơi sử dụng. Vật tư quản lý theo số lượng được tách dòng theo vị trí và trạng thái.</p>
+        <div class="card" style="padding:1.25rem;margin:16px 0;">
+          <div class="toolbar"><div><h2>Kiểm kê thực tế</h2><p class="muted">Nhập số lượng kiểm đếm, so sánh với số liệu hệ thống và xuất danh sách chênh lệch. Bản kiểm kê này là phiếu làm việc trên trình duyệt; chưa tự điều chỉnh tồn kho.</p></div><button class="primary" type="button" onclick="exportStocktakeCSV()">Xuất biên bản kiểm kê CSV</button></div>
+          <div class="filter-bar"><input id="stocktakeSearch" type="search" placeholder="Tìm mã, tên, danh mục..." oninput="renderStocktake()"><select id="stocktakeDiffFilter" onchange="renderStocktake()"><option value="all">Tất cả</option><option value="diff">Chỉ có chênh lệch</option><option value="missing">Chưa kiểm đếm</option></select><button class="secondary" type="button" onclick="resetStocktake()">Xóa số đã kiểm đếm</button><span class="muted" id="stocktakeSummary"></span></div>
+          <div class="table-card"><table class="table"><thead><tr><th>Mã</th><th>Tên tài sản/vật tư</th><th>Vị trí chính</th><th>Số lượng hệ thống</th><th>Số lượng thực tế</th><th>Chênh lệch</th><th>Ghi chú kiểm kê</th></tr></thead><tbody id="stocktakeBody"></tbody></table></div>
+        </div>
+        <div id="deviceHistoryPanel" class="card hidden" style="padding:1.25rem;margin:16px 0;"></div>
         <div class="card" style="padding: 2rem;">
           <h2>Xuất & Nhập dữ liệu hàng loạt</h2>
           <p class="muted" style="margin-top: 5px;">Tải dữ liệu ra file Excel hoặc nạp hàng loạt hàng trăm thiết bị cùng lúc</p>
