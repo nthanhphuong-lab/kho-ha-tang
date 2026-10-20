@@ -71,6 +71,9 @@
         <button class="nav-btn admin-only" title="Người dùng" aria-label="Người dùng" onclick="showView('users')">
           <span class="icon">👥</span> <span>Người dùng</span>
         </button>
+        <button class="nav-btn" title="Hướng dẫn nghiệp vụ" aria-label="Hướng dẫn nghiệp vụ" onclick="showView('guide')">
+          <span class="icon">📘</span> <span>Hướng dẫn nghiệp vụ</span>
+        </button>
       </nav>
       <div class="sidebar-footer">
         <div id="currentUserName" class="user-name" title="Tài khoản đang đăng nhập">Admin</div>
@@ -465,6 +468,110 @@
             <tbody id="userTableBody"></tbody>
           </table>
         </div>
+      </section>
+
+      <!-- TAB HƯỚNG DẪN NGHIỆP VỤ -->
+      <section id="guide" class="view hidden">
+        <div class="toolbar guide-toolbar">
+          <div><h2>Hướng dẫn sử dụng theo nghiệp vụ</h2><p class="muted">Hướng dẫn trực quan từng bước. Chọn “Mở chức năng” để chuyển thẳng đến màn hình thao tác.</p></div>
+        </div>
+        <div class="guide-notice"><span>💡</span><div><b>Nguyên tắc chung</b><p>Kiểm tra mã tài sản, số lượng, kho/vị trí và người nhận trước khi lưu. Với thao tác xuất, điều chuyển hoặc ghi nhận sự cố, hãy nhập ghi chú rõ ràng để thuận tiện tra cứu sau này.</p></div></div>
+        <div class="guide-grid">
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">📦</span><div><h3>1. Thêm tài sản / vật tư</h3><p class="muted">Khai báo đối tượng mới vào hệ thống</p></div></div>
+            <div class="guide-visual"><div class="mock-topbar">THIẾT BỊ <span>＋ Thêm mới</span></div><div class="mock-fields"><i>Mã tài sản</i><i>Tên thiết bị / vật tư</i><i>Danh mục · Đơn vị tính</i><i>Kho lưu trữ · Số lượng</i></div><div class="mock-action">Lưu thông tin</div></div>
+            <ol><li>Mở menu <b>Thiết bị</b>, chọn thêm mới.</li><li>Nhập mã, tên, danh mục, đơn vị tính và số lượng.</li><li>Chọn kho lưu trữ và kiểm tra dữ liệu rồi lưu.</li></ol>
+            <button class="secondary" onclick="showView('devices')">Mở chức năng Thiết bị →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">🔄</span><div><h3>2. Xuất / nhập / điều chuyển</h3><p class="muted">Ghi nhận biến động tài sản</p></div></div>
+            <div class="guide-visual"><div class="mock-flow"><span>🏢 Kho</span><b>→</b><span>📍 Nơi sử dụng</span></div><div class="mock-fields"><i>Chọn nghiệp vụ</i><i>Chọn nhiều tài sản / vật tư</i><i>Số lượng · Người nhận · Vị trí</i></div><div class="mock-action">Tạo phiếu nghiệp vụ</div></div>
+            <ol><li>Mở <b>Xuất / Nhập / Sự cố</b> và chọn loại nghiệp vụ.</li><li>Tìm thiết bị theo mã/tên; có thể chọn nhiều dòng.</li><li>Kiểm tra số lượng, nơi đến/người nhận, ghi chú rồi xác nhận.</li></ol>
+            <button class="secondary" onclick="showView('movements')">Mở Xuất / Nhập / Sự cố →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">🧰</span><div><h3>3. Báo hỏng, bảo hành, sửa chữa</h3><p class="muted">Theo dõi thiết bị cần xử lý</p></div></div>
+            <div class="guide-visual"><div class="mock-status-row"><span>Hỏng / Bảo hành</span><b>Chờ xử lý</b></div><div class="mock-status-row"><span>Đang sửa chữa</span><b>Đang thực hiện</b></div><div class="mock-status-row"><span>Thanh lý</span><b>Chờ hồ sơ</b></div></div>
+            <ol><li>Ghi nhận sự cố trong menu <b>Xuất / Nhập / Sự cố</b>.</li><li>Mở <b>Theo dõi hỏng / sửa chữa / thanh lý</b> để lọc trạng thái.</li><li>Cập nhật tiến độ và xuất CSV danh sách đang lọc khi cần.</li></ol>
+            <button class="secondary" onclick="showView('disposition')">Mở theo dõi xử lý →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">📍</span><div><h3>4. Quản lý kho và nơi sử dụng</h3><p class="muted">Chuẩn hóa vị trí để báo cáo chính xác</p></div></div>
+            <div class="guide-visual"><div class="mock-location"><span>🏬 Kho lưu trữ</span><b>→</b><span>🏫 Phòng / đơn vị</span></div><div class="mock-caption">Tên vị trí · Đơn vị quản lý · Người phụ trách</div></div>
+            <ol><li>Khai báo các kho tại <b>Kho lưu trữ</b>.</li><li>Khai báo phòng, đơn vị hoặc nơi sử dụng tại <b>Nơi sử dụng</b>.</li><li>Chọn đúng vị trí khi xuất hoặc điều chuyển tài sản.</li></ol>
+            <div class="guide-actions"><button class="secondary" onclick="showView('locations')">Kho lưu trữ</button><button class="secondary" onclick="showView('usageLocations')">Nơi sử dụng</button></div>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">📊</span><div><h3>5. Tra cứu và xuất báo cáo</h3><p class="muted">Tìm nhanh và xuất dữ liệu phục vụ tổng hợp</p></div></div>
+            <div class="guide-visual"><div class="mock-search">⌕ Từ khóa / mã / tên <span>Lọc</span></div><div class="mock-table"><div>Mã tài sản　Tên thiết bị　Vị trí</div><div>CAP-0002　Thiết bị mẫu　Phòng NOC</div><div>CAP-0003　Thiết bị mẫu　Phòng học</div></div><div class="mock-action">↓ Xuất CSV</div></div>
+            <ol><li>Mở <b>Báo cáo & Nhập Excel</b>.</li><li>Lọc theo từ khóa, đơn vị, người giữ hoặc trạng thái.</li><li>Kiểm tra kết quả rồi xuất CSV; khi nhập file, dùng mẫu đúng định dạng.</li></ol>
+            <button class="secondary" onclick="showView('reports')">Mở báo cáo →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">🧭</span><div><h3>6. Quay lại màn hình vừa xem</h3><p class="muted">Không bị lạc khi chuyển menu</p></div></div>
+            <div class="guide-visual"><div class="mock-browser"><span>←</span><span>→</span><div>Tổng quan　›　Giao dịch gần đây</div></div><div class="mock-caption">Vị trí hiện tại: Lịch sử điều chuyển & sự cố</div></div>
+            <ol><li>Dùng nút <b>←</b> trên đầu trang để quay lại menu trước.</li><li>Dùng nút <b>→</b> để đi tới menu kế tiếp.</li><li>Dòng “Vị trí hiện tại” cho biết bạn đang ở màn hình nào.</li></ol>
+            <button class="secondary" onclick="showView('dashboard')">Về Tổng quan →</button>
+          </article>
+        </div>
+        <div class="guide-section-title"><h2>Hướng dẫn các chức năng chi tiết</h2><p class="muted">Các hình dưới đây là sơ đồ minh họa theo đúng tên menu và thao tác có trong phiên bản này.</p></div>
+        <div class="guide-grid">
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">🏠</span><div><h3>7. Tổng quan và cảnh báo</h3><p class="muted">Xem nhanh tình hình kho và các việc cần xử lý</p></div></div>
+            <div class="guide-visual"><div class="guide-mock-stats"><span><b>Tổng tài sản</b><strong>01</strong></span><span><b>Trong kho</b><strong>02</strong></span><span><b>Hỏng / sửa</b><strong>03</strong></span></div><div class="mock-status-row"><span>⚠ Vật tư sắp hết / hết tồn tốt</span><b>Xem danh sách</b></div><div class="mock-status-row"><span>🧰 Hỏng, bảo hành, sửa chữa</span><b>Kiểm tra</b></div><div class="mock-caption">Số trong hình chỉ là ví dụ minh họa</div></div>
+            <ol><li>Mở <b>Tổng quan</b> sau khi đăng nhập.</li><li>Xem các thẻ thống kê, kho lưu trữ và nơi sử dụng.</li><li>Chọn cảnh báo để mở danh sách cần xử lý; xem tối đa các giao dịch gần đây được hiển thị.</li></ol>
+            <button class="secondary" onclick="showView('dashboard')">Mở Tổng quan →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">🔎</span><div><h3>8. Tìm kiếm, lọc và phân trang</h3><p class="muted">Tra cứu nhanh danh sách thiết bị và giao dịch</p></div></div>
+            <div class="guide-visual"><div class="mock-search">⌕ Mã / tên / từ khóa <span>Lọc</span></div><div class="mock-fields"><i>Danh mục</i><i>Kho / vị trí</i><i>Tình trạng</i><i>10 / 25 / 50 dòng</i></div><div class="mock-browser"><span>‹</span><div>Trang 1 / …</div><span>›</span></div></div>
+            <ol><li>Nhập mã quản lý hoặc tên vào ô tìm kiếm.</li><li>Kết hợp bộ lọc danh mục, vị trí hoặc tình trạng nếu có.</li><li>Dùng <b>Đặt lại</b> để xóa bộ lọc; chọn số dòng mỗi trang và chuyển trang để xem thêm.</li></ol>
+            <button class="secondary" onclick="showView('devices')">Mở danh sách thiết bị →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">☑️</span><div><h3>9. Chọn nhiều thiết bị và điều chuyển hàng loạt</h3><p class="muted">Tạo một phiếu cho nhiều mã thiết bị</p></div></div>
+            <div class="guide-visual"><div class="mock-table"><div>☑ Chọn　Mã　Tên tài sản</div><div>☑　EQ-001　Thiết bị A</div><div>☑　EQ-002　Thiết bị B</div></div><div class="mock-action">🔄 Điều chuyển hàng loạt · Đã chọn 2</div></div>
+            <ol><li>Trong danh sách <b>Thiết bị</b>, đánh dấu các dòng cần xử lý.</li><li>Thanh thao tác nổi cho biết số thiết bị đã chọn; chọn điều chuyển hàng loạt.</li><li>Trong cửa sổ chọn thiết bị, có thể lọc danh sách hoặc dán các mã; kiểm tra kỹ loại nghiệp vụ, số lượng và nơi đến trước khi lưu.</li></ol>
+            <button class="secondary" onclick="showView('devices')">Mở Thiết bị →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">🧾</span><div><h3>10. Tạo phiếu đơn lẻ và tra lịch sử</h3><p class="muted">Ghi nhận mọi biến động tài sản</p></div></div>
+            <div class="guide-visual"><div class="mock-flow"><span>Chọn nghiệp vụ</span><b>→</b><span>Chọn thiết bị</span><b>→</b><span>Kiểm tra</span></div><div class="mock-fields"><i>Ngày giao dịch</i><i>Người nhận / phụ trách</i><i>Kho / nơi sử dụng</i><i>Ghi chú</i></div><div class="mock-action">Lưu phiếu · Tra cứu lịch sử</div></div>
+            <ol><li>Mở <b>Xuất / Nhập / Sự cố</b>, chọn <b>Tạo phiếu đơn lẻ</b> hoặc phiếu nhiều thiết bị.</li><li>Chọn đúng nghiệp vụ: nhập kho, xuất sử dụng, điều chuyển kho/nơi dùng, thu hồi hoặc nghiệp vụ sự cố.</li><li>Sau khi lưu, tra lại tại <b>Lịch sử điều chuyển & sự cố</b>; dùng bộ lọc và xuất CSV khi cần.</li><li>Chỉ hủy hoặc xóa lịch sử khi được phân quyền và đã kiểm tra ảnh hưởng dữ liệu.</li></ol>
+            <button class="secondary" onclick="showView('movements')">Mở lịch sử giao dịch →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">🛠️</span><div><h3>11. Theo dõi hỏng, bảo hành, sửa chữa, thanh lý</h3><p class="muted">Lọc theo nghiệp vụ và vị trí</p></div></div>
+            <div class="guide-visual"><div class="mock-fields"><i>Loại: Hỏng / Bảo hành</i><i>Vị trí: Tất cả</i><i>Loại: Đang sửa chữa</i><i>Loại: Thanh lý</i></div><div class="mock-action">Lọc danh sách → Xuất CSV</div></div>
+            <ol><li>Ghi nhận sự cố hoặc chuyển trạng thái qua menu nghiệp vụ.</li><li>Mở <b>Theo dõi thiết bị hỏng, bảo hành, sửa chữa và thanh lý</b>.</li><li>Lọc theo loại nghiệp vụ và kho/vị trí; đặt lại bộ lọc khi muốn xem tất cả.</li><li>Xuất CSV của danh sách đang lọc để tổng hợp. Kiểm tra trạng thái trước khi thực hiện nghiệp vụ tiếp theo.</li></ol>
+            <button class="secondary" onclick="showView('disposition')">Mở Theo dõi xử lý →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">🏷️</span><div><h3>12. Danh mục thiết bị và đơn vị tính</h3><p class="muted">Chuẩn hóa loại tài sản / vật tư</p></div></div>
+            <div class="guide-visual"><div class="mock-topbar">DANH MỤC THIẾT BỊ <span>＋ Thêm danh mục</span></div><div class="mock-fields"><i>Tên danh mục</i><i>Đơn vị tính mặc định</i><i>Đổi tên danh mục</i><i>Kiểm tra trước khi xóa</i></div></div>
+            <ol><li>Mở <b>Danh mục</b> để thêm danh mục mới và đơn vị tính mặc định.</li><li>Chọn tên danh mục thống nhất, ví dụ nhóm thiết bị hoặc nhóm vật tư.</li><li>Đổi tên hoặc xóa chỉ sau khi kiểm tra các thiết bị đang dùng danh mục đó.</li></ol>
+            <button class="secondary" onclick="showView('categories')">Mở Danh mục →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">📥</span><div><h3>13. Nhập Excel/CSV và xuất dữ liệu</h3><p class="muted">Sao lưu, kiểm kê hoặc cập nhật danh sách hàng loạt</p></div></div>
+            <div class="guide-visual"><div class="mock-flow"><span>⬇ Tải CSV mẫu</span><b>→</b><span>✍ Điền dữ liệu</span><b>→</b><span>⬆ Nhập file</span></div><div class="mock-status-row"><span>Xuất danh sách thiết bị</span><b>CSV</b></div><div class="mock-status-row"><span>Xuất lịch sử giao dịch</span><b>CSV</b></div></div>
+            <ol><li>Vào <b>Báo cáo & Nhập Excel</b>, tải file CSV mẫu trước khi chuẩn bị dữ liệu.</li><li>Giữ nguyên tên cột và định dạng; kiểm tra mã quản lý không trùng, số lượng hợp lệ và thông tin bắt buộc.</li><li>Chọn nhập file và đọc thông báo kết quả; nên xuất dữ liệu hiện tại để lưu bản đối chiếu trước khi nhập số lượng lớn.</li><li>Dùng các nút xuất danh sách thiết bị, lịch sử giao dịch hoặc báo cáo đang lọc theo nhu cầu.</li></ol>
+            <button class="secondary" onclick="showView('reports')">Mở Báo cáo & Nhập Excel →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">👥</span><div><h3>14. Quản trị người dùng và phân quyền</h3><p class="muted">Quản lý tài khoản truy cập</p></div></div>
+            <div class="guide-visual"><div class="mock-topbar">QUẢN TRỊ NGƯỜI DÙNG <span>＋ Thêm người dùng</span></div><div class="mock-table"><div>Tên đăng nhập　Tên hiển thị　Vai trò</div><div>user01　Người dùng　Người dùng</div><div>admin　Quản trị　Quản trị</div></div><div class="mock-caption">Tên và vai trò trong hình chỉ là ví dụ</div></div>
+            <ol><li>Mở <b>Người dùng</b> bằng tài khoản có quyền quản trị.</li><li>Thêm tài khoản, khai báo tên đăng nhập, tên hiển thị và vai trò theo biểu mẫu.</li><li>Kiểm tra quyền trước khi lưu; chỉ cấp quyền quản trị cho người được ủy quyền.</li><li>Khi người dùng nghỉ hoặc không còn nhu cầu truy cập, rà soát và xử lý tài khoản theo quy định nội bộ.</li></ol>
+            <button class="secondary" onclick="showView('users')">Mở Người dùng →</button>
+          </article>
+          <article class="card guide-card">
+            <div class="guide-card-head"><span class="guide-icon">📷</span><div><h3>15. Quét mã thiết bị (nếu thiết bị hỗ trợ)</h3><p class="muted">Tra cứu hoặc nhập mã nhanh</p></div></div>
+            <div class="guide-visual"><div class="mock-flow"><span>📷 Mở quét mã</span><b>→</b><span>Quét / nhập mã</span><b>→</b><span>Đối chiếu</span></div><div class="mock-caption">Luôn xác nhận mã đọc được với tem thực tế trước khi lưu giao dịch.</div></div>
+            <ol><li>Khi biểu mẫu có chức năng quét mã, cấp quyền camera cho trình duyệt nếu được yêu cầu.</li><li>Đưa mã vào vùng quét hoặc nhập mã thủ công nếu camera không hoạt động.</li><li>Đối chiếu mã và tên tài sản hiển thị; không xác nhận chỉ dựa trên kết quả quét nếu chưa chắc chắn.</li></ol>
+            <button class="secondary" onclick="showView('devices')">Mở Thiết bị →</button>
+          </article>
+        </div>
+        <div class="guide-footer muted">Tên nút hoặc trường có thể khác đôi chút tùy quyền tài khoản và phiên bản đang sử dụng. Chỉ thực hiện thao tác mà tài khoản của bạn được phân quyền.</div>
       </section>
     </main>
   </div>
