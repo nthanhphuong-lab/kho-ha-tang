@@ -236,6 +236,7 @@
             <tbody id="deviceTableBody"></tbody>
           </table>
         </div>
+        <div id="deviceHistoryPanel" class="card hidden" style="padding:1.25rem;margin:16px 0;"></div>
       </section>
 
       <!-- TAB 3: VỊ TRÍ & KHO -->
@@ -442,7 +443,6 @@
           <div class="filter-bar"><input id="stocktakeSearch" type="search" placeholder="Tìm mã, tên, danh mục..." oninput="renderStocktake()"><select id="stocktakeDiffFilter" onchange="renderStocktake()"><option value="all">Tất cả</option><option value="diff">Chỉ có chênh lệch</option><option value="missing">Chưa kiểm đếm</option></select><button class="secondary" type="button" onclick="resetStocktake()">Xóa số đã kiểm đếm</button><span class="muted" id="stocktakeSummary"></span></div>
           <div class="table-card"><table class="table"><thead><tr><th>Mã</th><th>Tên tài sản/vật tư</th><th>Vị trí chính</th><th>Số lượng hệ thống</th><th>Số lượng thực tế</th><th>Chênh lệch</th><th>Ghi chú kiểm kê</th></tr></thead><tbody id="stocktakeBody"></tbody></table></div>
         </div>
-        <div id="deviceHistoryPanel" class="card hidden" style="padding:1.25rem;margin:16px 0;"></div>
         <div class="card" style="padding: 2rem;">
           <h2>Xuất & Nhập dữ liệu hàng loạt</h2>
           <p class="muted" style="margin-top: 5px;">Tải dữ liệu ra file Excel hoặc nạp hàng loạt hàng trăm thiết bị cùng lúc</p>
