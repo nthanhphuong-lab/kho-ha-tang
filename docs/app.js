@@ -57,6 +57,11 @@ document.addEventListener("click", (e) => {
     exportEntityInventory();
   } else if (act === "entity-inventory-close") {
     closeEntityInventory();
+  } else if (act === "device-history") {
+    openDeviceHistory(val);
+  } else if (act === "device-history-close") {
+    const panel = document.getElementById("deviceHistoryPanel");
+    if (panel) { panel.classList.add("hidden"); panel.innerHTML = ""; }
   } else if (act === "edit-dev") {
     openDeviceModal(val);
   } else if (act === "quick-mov") {
@@ -680,10 +685,11 @@ function renderDevices() {
     const codeAttr = escapeAttr(d.code || "");
     const unitText = escapeHtml(d.unit || "cái");
     let locationText = d.usageLocation || d.location || "—";
+    let locationTitle = String(locationText || "—");
     if (d.trackingMode === "quantity") {
       const parts = [];
       const addMap = (map, prefix = "") => Object.entries(map || {}).filter(([, qty]) => Number(qty) > 0)
-        .forEach(([loc, qty]) => parts.push(`${prefix}${escapeHtml(loc)}: ${Number(qty).toLocaleString("vi-VN")} ${unitText}`));
+        .forEach(([loc, qty]) => parts.push(`${prefix}${loc}: ${Number(qty).toLocaleString("vi-VN")} ${d.unit || "cái"}`));
       addMap(d.stockByLocation);
       addMap(d.usageByLocation, "Đang dùng — ");
       addMap(d.damagedByLocation, "Hỏng — ");
@@ -691,8 +697,14 @@ function renderDevices() {
       addMap(d.repairByLocation, "Đang sửa — ");
       addMap(d.usageRepairByLocation, "Đang sửa tại nơi dùng — ");
       addMap(d.disposedByLocation, "Thanh lý — ");
-      locationText = parts.join("; ") || escapeHtml(d.location || "—");
-    } else locationText = escapeHtml(locationText);
+      locationTitle = parts.join("; ") || String(d.location || "—");
+      const first = parts[0] || String(d.location || "—");
+      locationText = parts.length > 1 ? `${first} <span class="location-more">+${parts.length - 1} vị trí/trạng thái</span>` : escapeHtml(first);
+    } else {
+      locationTitle = String(locationText || "—");
+      locationText = `<span class="location-compact">${escapeHtml(locationTitle)}</span>`;
+    }
+    const locationTitleAttr = escapeAttr(locationTitle);
     const status = displayDeviceStatus(d);
     const statusClass = d.trackingMode === "quantity"
       ? (deviceStockQuantity(d) > 0 ? "badge-primary" : (deviceDamagedQuantity(d) > 0 ? "badge-danger" : "badge-secondary"))
@@ -707,7 +719,7 @@ function renderDevices() {
         <td>${escapeHtml(d.model || "—")}</td>
         <td><code>${escapeHtml(d.serial || "—")}</code></td>
         <td>${escapeHtml(d.category || "—")}</td>
-        <td><b>${locationText}</b></td>
+        <td class="device-location-cell"><b title="${locationTitleAttr}">${locationText}</b></td>
         <td><b>${d.trackingMode === "quantity" ? Number(d.quantity || 0).toLocaleString("vi-VN") : "1"} ${unitText}</b></td>
         <td><span class="badge ${statusClass}">${escapeHtml(status)}</span></td>
         <td class="device-actions">
