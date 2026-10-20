@@ -80,6 +80,8 @@ document.addEventListener("click", (e) => {
     deleteUsageLocation(val);
   } else if (act === "cancel-movement") {
     cancelMovement(val);
+  } else if (act === "delete-movement") {
+    deleteMovementHistory(val);
   } else if (act === "dashboard-location-close") {
     const detail = document.getElementById("dashboardLocationDetail");
     if (detail) { detail.classList.add("hidden"); detail.innerHTML = ""; }
@@ -138,6 +140,7 @@ function showView(viewId) {
     usageLocations: "Nơi sử dụng",
     categories: "Danh mục thiết bị",
     movements: "Lịch sử điều chuyển & sự cố",
+    disposition: "Theo dõi hỏng / sửa chữa / thanh lý",
     reports: "Báo cáo & Nhập Excel",
     users: "Quản trị người dùng"
   };
@@ -243,6 +246,7 @@ async function loadState() {
     populateSelects();
     renderDevices();
     renderMovements();
+    renderDisposition();
     renderCategories();
     renderLocations();
     renderUsageLocations();
@@ -274,15 +278,15 @@ function renderDashboard() {
 function getDeviceQuantityAtLocation(device, location) {
   const qty = Number(device.quantity);
   if (device.trackingMode === "quantity") {
-    return Math.max(0, Number((device.stockByLocation || {})[location] || 0) + Number((device.damagedByLocation || {})[location] || 0) + Number((device.usageByLocation || {})[location] || 0) + Number((device.usageDamagedByLocation || {})[location] || 0) + Number((device.usageRepairByLocation || {})[location] || 0));
+    return Math.max(0, Number((device.stockByLocation || {})[location] || 0) + Number((device.damagedByLocation || {})[location] || 0) + Number((device.usageByLocation || {})[location] || 0) + Number((device.usageDamagedByLocation || {})[location] || 0) + Number((device.usageRepairByLocation || {})[location] || 0) + Number((device.disposedByLocation || {})[location] || 0));
   }
   const same = String(device.location || "").trim().toLowerCase() === String(location || "").trim().toLowerCase();
   return same ? (Number.isFinite(qty) && qty > 0 ? qty : 1) : 0;
 }
 
 function getWarehouseQuantityAtLocation(device, location) {
-  if (device.trackingMode === "quantity") return Math.max(0, Number((device.stockByLocation || {})[location] || 0) + Number((device.damagedByLocation || {})[location] || 0) + Number((device.repairByLocation || {})[location] || 0));
-  if (device.status === "Đang sử dụng" || device.status === "Thanh lý") return 0;
+  if (device.trackingMode === "quantity") return Math.max(0, Number((device.stockByLocation || {})[location] || 0) + Number((device.damagedByLocation || {})[location] || 0) + Number((device.repairByLocation || {})[location] || 0) + Number((device.disposedByLocation || {})[location] || 0));
+  if (device.status === "Đang sử dụng") return 0;
   return String(device.location || "").trim().toLowerCase() === String(location || "").trim().toLowerCase() ? 1 : 0;
 }
 function displayDeviceStatus(d) {
@@ -293,6 +297,7 @@ function displayDeviceStatus(d) {
   if (use > 0) labels.push(`Đang sử dụng: ${use.toLocaleString("vi-VN")}`);
   if (damaged > 0) labels.push(`Hỏng/chờ xử lý: ${damaged.toLocaleString("vi-VN")}`);
   if (repair > 0) labels.push(`Đang sửa: ${repair.toLocaleString("vi-VN")}`);
+  const disposed = sumQtyMap(d.disposedByLocation); if (disposed > 0) labels.push(`Thanh lý: ${disposed.toLocaleString("vi-VN")}`);
   return labels.join(" / ") || "Hết tồn";
 }
 
@@ -309,7 +314,7 @@ function renderDashboardLocations() {
   container.innerHTML = locations.map(loc => {
     const records = STATE.devices.filter(d => getWarehouseQuantityAtLocation(d, loc) > 0);
     const qty = records.reduce((sum, d) => sum + getWarehouseQuantityAtLocation(d, loc), 0);
-    const damaged = records.reduce((sum, d) => sum + (d.trackingMode === "quantity" ? Number((d.damagedByLocation || {})[loc] || 0) + Number((d.repairByLocation || {})[loc] || 0) : (/Hỏng|Bảo hành|Đang sửa chữa/i.test(d.status || "") ? getWarehouseQuantityAtLocation(d, loc) : 0)), 0);
+    const damaged = records.reduce((sum, d) => sum + (d.trackingMode === "quantity" ? Number((d.damagedByLocation || {})[loc] || 0) + Number((d.repairByLocation || {})[loc] || 0) : (/Hỏng|Bảo hành|Đang sửa chữa|Thanh lý/i.test(d.status || "") ? getWarehouseQuantityAtLocation(d, loc) : 0)), 0);
     return `<button type="button" data-act="dashboard-location" data-val="${escapeAttr(loc)}" class="card" style="text-align:left; cursor:pointer; border:1px solid var(--border-color, #dbe2ea); padding:14px; background:var(--card-bg, #fff); color:inherit; min-height:120px;">
       <div style="font-size:22px; margin-bottom:8px;">📦</div>
       <div style="font-weight:700; line-height:1.35;">${escapeHtml(loc)}</div>
@@ -686,12 +691,14 @@ function handleMovementTypeChange() {
   const type = document.getElementById("movType")?.value || "Xuất kho sử dụng";
   const isIn = type === "Nhập kho", isUseOut = type === "Xuất kho sử dụng", isTransfer = type === "Điều chuyển kho", isReturn = type === "Thu hồi về kho", isUseTransfer = type === "Điều chuyển nơi sử dụng", isRepair = type === "Đã sửa xong / Nhập lại kho", isSendRepair = type === "Chuyển sang sửa chữa", isDamage = type === "Báo hỏng / Đi bảo hành", isDispose = type === "Báo thanh lý";
   const sourceTypeEl = document.getElementById("movDamageSourceType");
-  const sourceType = sourceTypeEl?.value || "warehouse";
+  let sourceType = sourceTypeEl?.value || "warehouse";
+  if (isDamage && !["warehouse", "usage"].includes(sourceType)) { sourceType = "warehouse"; if (sourceTypeEl) sourceTypeEl.value = sourceType; }
+  if (sourceTypeEl) Array.from(sourceTypeEl.options).forEach(opt => { if (["damaged", "repair"].includes(opt.value)) opt.hidden = !isDispose; });
   const needsSourceChoice = isDamage || isDispose;
   document.getElementById("movDamageSourceWrap")?.classList.toggle("hidden", !needsSourceChoice);
-  const showFromW = !isIn && !isReturn && !isUseTransfer && (!needsSourceChoice || sourceType === "warehouse");
+  const showFromW = !isIn && !isReturn && !isUseTransfer && (!needsSourceChoice || sourceType === "warehouse" || (isDispose && ["damaged", "repair"].includes(sourceType)));
   const showFromU = isReturn || isUseTransfer || (needsSourceChoice && sourceType === "usage");
-  const showToW = isIn || isTransfer || isReturn || isDamage || isRepair || isSendRepair;
+  const showToW = isIn || isTransfer || isReturn || isDamage || isRepair || isSendRepair || isDispose;
   const showUsage = isUseOut || isUseTransfer;
   document.getElementById("movFromWarehouseWrap")?.classList.toggle("hidden", !showFromW);
   document.getElementById("movFromUsageWrap")?.classList.toggle("hidden", !showFromU);
@@ -703,15 +710,15 @@ function handleMovementTypeChange() {
   const fu = document.getElementById("movFromUsageLocation"); if (fu) fu.required = isReturn || isUseTransfer || (needsSourceChoice && sourceType === "usage");
   const dev = STATE.devices.find(d => d.code === document.getElementById("movDeviceCode")?.value);
   if (dev?.trackingMode === "quantity") {
-    const map = isRepair ? (Number((dev.repairByLocation || {})[fw?.value] || 0) > 0 ? dev.repairByLocation : (dev.damagedByLocation || {})) : isSendRepair ? (dev.damagedByLocation || {}) : (dev.stockByLocation || {});
+    const map = isRepair ? (Number((dev.repairByLocation || {})[fw?.value] || 0) > 0 ? dev.repairByLocation : (dev.damagedByLocation || {})) : isSendRepair ? (dev.damagedByLocation || {}) : (isDispose && sourceType === "damaged") ? (dev.damagedByLocation || {}) : (isDispose && sourceType === "repair") ? (dev.repairByLocation || {}) : (dev.stockByLocation || {});
     const opts = STATE.locations.filter(l => Number(map[l] || 0) > 0);
     if (fw) { const previous = fw.value; fw.innerHTML = (opts.length ? opts : STATE.locations).map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}${opts.length ? ` — ${isRepair ? "đang sửa/hỏng" : isSendRepair ? "hàng hỏng" : "còn"} ${Number(map[l] || 0).toLocaleString("vi-VN")} ${escapeHtml(dev.unit || "cái")}` : ""}</option>`).join(""); if (opts.includes(previous)) fw.value = previous; }
   }
-  if ((isIn || isTransfer || isReturn || isRepair) && to && !to.value) setElementValueSafe("movToLocation", STATE.locations[0] || "", true);
+  if ((isIn || isTransfer || isReturn || isRepair || isDispose) && to && !to.value) setElementValueSafe("movToLocation", STATE.locations[0] || "", true);
   if (isUseTransfer) { const targetUse = document.getElementById("movUsageLocation"); const sourceUse = document.getElementById("movFromUsageLocation")?.value; const alternative = STATE.usageLocations.map(l => l.name || l).find(l => l !== sourceUse); if (targetUse && alternative && targetUse.value === sourceUse) targetUse.value = alternative; }
   const note = document.getElementById("movNote"); if (note) note.placeholder = isIn ? "Nguồn nhập, số hóa đơn/biên bản..." : isUseOut ? "Mục đích cấp phát, công trình..." : isDamage ? "Mô tả hư hỏng..." : "Ghi chú / lý do giao dịch...";
   const label = document.getElementById("movAvailableQty");
-  if (label && dev?.trackingMode === "quantity") { const source = (isReturn || isUseTransfer || (needsSourceChoice && sourceType === "usage")) ? Number((dev.usageByLocation || {})[fu?.value] || 0) : (isRepair ? Number(((Number((dev.repairByLocation || {})[fw?.value] || 0) > 0 ? dev.repairByLocation : dev.damagedByLocation) || {})[fw?.value] || 0) : isSendRepair ? Number((dev.damagedByLocation || {})[fw?.value] || 0) : Number((dev.stockByLocation || {})[fw?.value] || 0)); label.textContent = `Số dư nguồn hiện tại: ${source.toLocaleString("vi-VN")} ${dev.unit || "cái"}`; } else if (label) label.textContent = "";
+  if (label && dev?.trackingMode === "quantity") { const source = (isReturn || isUseTransfer || (needsSourceChoice && sourceType === "usage")) ? Number((dev.usageByLocation || {})[fu?.value] || 0) : (isRepair ? Number(((Number((dev.repairByLocation || {})[fw?.value] || 0) > 0 ? dev.repairByLocation : dev.damagedByLocation) || {})[fw?.value] || 0) : isSendRepair || (isDispose && sourceType === "damaged") ? Number((dev.damagedByLocation || {})[fw?.value] || 0) : (isDispose && sourceType === "repair") ? Number((dev.repairByLocation || {})[fw?.value] || 0) : Number((dev.stockByLocation || {})[fw?.value] || 0)); label.textContent = `Số dư nguồn hiện tại: ${source.toLocaleString("vi-VN")} ${dev.unit || "cái"}`; } else if (label) label.textContent = "";
 }
 async function handleSaveMovement(e) {
   e.preventDefault();
@@ -732,7 +739,7 @@ async function handleSaveMovement(e) {
       sourceUsage = dev.usageLocation || dev.location || fromUsage;
     }
   }
-  const payload = { deviceCode, type, fromLocation: (isIn || isReturn || isUseTransfer || sourceUsage) ? "" : fromLocation, toLocation: (isUseOut || isUseTransfer || isDispose) ? "" : toLocation, usageLocation: (isUseOut || isUseTransfer) ? usageLocation : "", fromUsageLocation: sourceUsage, quantity, department: document.getElementById("movDepartment")?.value.trim() || "", recipient: document.getElementById("movRecipient")?.value.trim() || "", referenceNo: document.getElementById("movReferenceNo")?.value.trim() || "", note: document.getElementById("movNote")?.value.trim() || "" };
+  const payload = { deviceCode, type, sourceMode: damageSourceType, fromLocation: (isIn || isReturn || isUseTransfer || sourceUsage) ? "" : fromLocation, toLocation: (isUseOut || isUseTransfer) ? "" : toLocation, usageLocation: (isUseOut || isUseTransfer) ? usageLocation : "", fromUsageLocation: sourceUsage, quantity, department: document.getElementById("movDepartment")?.value.trim() || "", recipient: document.getElementById("movRecipient")?.value.trim() || "", referenceNo: document.getElementById("movReferenceNo")?.value.trim() || "", note: document.getElementById("movNote")?.value.trim() || "" };
   try { await callMutate("movement.create", payload); closeModal("movementModal"); await loadState(); } catch (err) { /* server validation already shown */ }
 }
 
@@ -755,7 +762,7 @@ function renderMovements() {
       <td><b>${escapeHtml(m.toLocation || m.usageLocation || "-")}</b></td>
       <td><small>${Number(m.quantity || 1).toLocaleString("vi-VN")} ${escapeHtml(m.unit || "cái")}${m.department ? ` · ${escapeHtml(m.department)}` : ""}${m.recipient ? ` · Người nhận: ${escapeHtml(m.recipient)}` : ""}${m.referenceNo ? ` · Phiếu: ${escapeHtml(m.referenceNo)}` : ""}${m.note ? ` · ${escapeHtml(m.note)}` : ""}</small></td>
       <td>${escapeHtml(m.createdBy || "-")}</td>
-      ${isAdmin ? `<td>${canCancel ? `<button type="button" class="danger" data-act="cancel-movement" data-val="${escapeAttr(m.id)}" style="color:#b91c1c;">Hủy & hoàn tác</button>` : isCancelled ? `<span class="muted">Đã hủy</span>` : `<button type="button" disabled title="Phiếu cũ thiếu ảnh chụp dữ liệu trước/sau, không thể hoàn tác an toàn">Không thể hoàn tác</button>`}</td>` : ""}
+      ${isAdmin ? `<td><div style="display:flex;gap:6px;flex-wrap:wrap;">${canCancel ? `<button type="button" class="danger" data-act="cancel-movement" data-val="${escapeAttr(m.id)}" style="color:#b91c1c;">Hủy & hoàn tác</button>` : isCancelled ? `<span class="muted">Đã hủy</span>` : `<button type="button" disabled title="Phiếu cũ thiếu ảnh chụp dữ liệu trước/sau, không thể hoàn tác an toàn">Không thể hoàn tác</button>`}<button type="button" class="secondary" data-act="delete-movement" data-val="${escapeAttr(m.id)}" title="Chỉ xóa nhật ký, không thay đổi dữ liệu thiết bị">Xóa lịch sử</button></div></td>` : ""}
     </tr>`;
   }).join("");
   const table = tbody.closest("table");
@@ -765,6 +772,26 @@ function renderMovements() {
     if (isAdmin && !hasAction) headRow.insertAdjacentHTML("beforeend", '<th class="admin-only" data-movement-action-header="1">Thao tác</th>');
     if (!isAdmin && hasAction) hasAction.remove();
   }
+}
+
+async function deleteMovementHistory(id) {
+  if (STATE.currentUser?.role !== "admin") return alert("Chỉ Admin mới được xóa lịch sử.");
+  const record = STATE.movements.find(m => String(m.id) === String(id));
+  if (!record) return alert("Không tìm thấy bản ghi lịch sử.");
+  const isBatch = Boolean(record.batchId);
+  const scope = isBatch ? `toàn bộ nhật ký của phiếu hàng loạt ${record.batchId}` : `bản ghi ${record.id}`;
+  if (!confirm(`XÓA LỊCH SỬ?
+
+Bạn sắp xóa ${scope}.
+
+Thao tác này chỉ xóa nhật ký, KHÔNG thay đổi trạng thái, vị trí hoặc số lượng thiết bị. Không thể khôi phục lịch sử đã xóa.
+
+Bạn đã sao lưu dữ liệu chưa?`)) return;
+  try {
+    await callMutate("movement.delete", { id });
+    await loadState();
+    alert("Đã xóa nhật ký. Dữ liệu thiết bị/kho không bị thay đổi.");
+  } catch (e) { /* API hiển thị lỗi */ }
 }
 
 async function cancelMovement(id) {
@@ -793,6 +820,44 @@ Hệ thống sẽ kiểm tra toàn bộ tài sản trước khi thay đổi. N�
   } catch (e) { /* API hiển thị lỗi */ }
 }
 
+// THEO DÕI THIẾT BỊ HỎNG, SỬA CHỮA, THANH LÝ
+function dispositionRows() {
+  const rows = [];
+  for (const d of STATE.devices) {
+    if (d.trackingMode === "quantity") {
+      for (const [loc, qty] of Object.entries(d.damagedByLocation || {})) if (Number(qty) > 0) rows.push({ code:d.code, name:d.name, category:d.category, type:"Hỏng / Bảo hành", location:loc, quantity:Number(qty), unit:d.unit||"cái", status:"Chờ xử lý", note:d.notes||"" });
+      for (const [loc, qty] of Object.entries(d.usageDamagedByLocation || {})) if (Number(qty) > 0) rows.push({ code:d.code, name:d.name, category:d.category, type:"Hỏng tại nơi sử dụng", location:loc, quantity:Number(qty), unit:d.unit||"cái", status:"Chờ xử lý", note:d.notes||"" });
+      for (const [loc, qty] of Object.entries(d.repairByLocation || {})) if (Number(qty) > 0) rows.push({ code:d.code, name:d.name, category:d.category, type:"Đang sửa chữa", location:loc, quantity:Number(qty), unit:d.unit||"cái", status:"Đang sửa chữa", note:d.notes||"" });
+      for (const [loc, qty] of Object.entries(d.usageRepairByLocation || {})) if (Number(qty) > 0) rows.push({ code:d.code, name:d.name, category:d.category, type:"Sửa chữa tại nơi sử dụng", location:loc, quantity:Number(qty), unit:d.unit||"cái", status:"Đang sửa chữa", note:d.notes||"" });
+      for (const [loc, qty] of Object.entries(d.disposedByLocation || {})) if (Number(qty) > 0) rows.push({ code:d.code, name:d.name, category:d.category, type:"Thanh lý", location:loc, quantity:Number(qty), unit:d.unit||"cái", status:"Thanh lý / Chờ bàn giao", note:d.notes||"" });
+    } else {
+      if (/hỏng|bảo hành/i.test(d.status || "")) rows.push({ code:d.code, name:d.name, category:d.category, type:"Hỏng / Bảo hành", location:d.location || d.usageLocation || "Chưa xác định", quantity:1, unit:d.unit||"cái", status:d.status, note:d.notes||"" });
+      if (/đang sửa chữa/i.test(d.status || "")) rows.push({ code:d.code, name:d.name, category:d.category, type:"Đang sửa chữa", location:d.location || "Chưa xác định", quantity:1, unit:d.unit||"cái", status:d.status, note:d.notes||"" });
+      if (/thanh lý/i.test(d.status || "")) rows.push({ code:d.code, name:d.name, category:d.category, type:"Thanh lý", location:d.location || "Chưa xác định", quantity:1, unit:d.unit||"cái", status:d.status, note:d.notes||"" });
+    }
+  }
+  return rows;
+}
+function renderDisposition() {
+  const body = document.getElementById("dispositionTableBody"); if (!body) return;
+  const query = (document.getElementById("dispositionSearch")?.value || "").trim().toLowerCase();
+  const filter = document.getElementById("dispositionTypeFilter")?.value || "";
+  const all = dispositionRows();
+  const filtered = all.filter(r => (!filter || r.type === filter) && (!query || [r.code,r.name,r.category,r.location,r.status,r.note,r.type].some(v => String(v||"").toLowerCase().includes(query))));
+  const counts = { total: all.reduce((n,r)=>n+r.quantity,0), disposed: all.filter(r=>r.type==="Thanh lý").reduce((n,r)=>n+r.quantity,0), damaged: all.filter(r=>r.type.toLowerCase().includes("hỏng")||r.type.includes("Bảo hành")).reduce((n,r)=>n+r.quantity,0), repair: all.filter(r=>r.type.toLowerCase().includes("sửa chữa")).reduce((n,r)=>n+r.quantity,0) };
+  const set = (id,val) => { const el=document.getElementById(id); if(el) el.textContent=Number(val).toLocaleString("vi-VN"); };
+  set("dispositionTotal", counts.total); set("dispositionDisposed", counts.disposed); set("dispositionDamaged", counts.damaged); set("dispositionRepair", counts.repair);
+  body.innerHTML = filtered.map(r => `<tr><td><b>${escapeHtml(r.code)}</b></td><td>${escapeHtml(r.name||"")}</td><td>${escapeHtml(r.category||"")}</td><td><span class="badge ${r.type==="Thanh lý"?"badge-danger":"badge-secondary"}">${escapeHtml(r.type)}</span></td><td><b>${escapeHtml(r.location)}</b></td><td>${Number(r.quantity).toLocaleString("vi-VN")} ${escapeHtml(r.unit)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note)}</td></tr>`).join("") || `<tr><td colspan="8" class="muted" style="text-align:center;padding:20px;">Không có thiết bị/vật tư phù hợp.</td></tr>`;
+  const count = document.getElementById("dispositionResultCount"); if(count) count.textContent=`Hiển thị ${filtered.length} dòng quản lý xử lý`;
+}
+function exportDispositionCSV() {
+  const query = (document.getElementById("dispositionSearch")?.value || "").trim().toLowerCase();
+  const filter = document.getElementById("dispositionTypeFilter")?.value || "";
+  const rows = dispositionRows().filter(r => (!filter || r.type === filter) && (!query || [r.code,r.name,r.category,r.location,r.status,r.note,r.type].some(v => String(v||"").toLowerCase().includes(query))));
+  const out = [["Mã thiết bị/vật tư","Tên","Danh mục","Nghiệp vụ","Kho/vị trí quản lý","Số lượng","Đơn vị","Trạng thái","Ghi chú"], ...rows.map(r=>[r.code,r.name,r.category,r.type,r.location,r.quantity,r.unit,r.status,r.note])];
+  downloadCSV(`theo_doi_hong_sua_chua_thanh_ly_${new Date().toISOString().slice(0,10)}.csv`, out);
+}
+
 // ----------------------------------------------------
 // VỊ TRÍ & KHO (LOCATIONS)
 // ----------------------------------------------------
@@ -800,7 +865,7 @@ function renderLocations() {
   const tbody = document.getElementById("locationTableBody"); if (!tbody) return;
   const isAdmin = STATE.currentUser?.role === "admin";
   tbody.innerHTML = STATE.locations.map((loc, idx) => {
-    const count = STATE.devices.reduce((sum, d) => sum + (d.trackingMode === "quantity" ? Number((d.stockByLocation || {})[loc] || 0) + Number((d.damagedByLocation || {})[loc] || 0) : (d.status !== "Đang sử dụng" && d.location === loc ? 1 : 0)), 0);
+    const count = STATE.devices.reduce((sum, d) => sum + (d.trackingMode === "quantity" ? Number((d.stockByLocation || {})[loc] || 0) + Number((d.damagedByLocation || {})[loc] || 0) + Number((d.repairByLocation || {})[loc] || 0) + Number((d.disposedByLocation || {})[loc] || 0) : (d.status !== "Đang sử dụng" && d.location === loc ? 1 : 0)), 0);
     return `<tr><td>${idx + 1}</td><td><b>${escapeHtml(loc)}</b></td><td><span class="badge badge-secondary">${count.toLocaleString("vi-VN")} đơn vị</span></td>${isAdmin ? `<td style="text-align:right;"><button type="button" data-act="rename-loc" data-val="${escapeAttr(loc)}">Đổi tên</button> <button type="button" data-act="del-loc" data-val="${escapeAttr(loc)}" style="color:red">Xóa</button></td>` : `<td></td>`}</tr>`;
   }).join("");
 }
@@ -946,7 +1011,7 @@ function handleBulkTypeChange() {
   const warehouseWrap = document.getElementById("bulkWarehouseWrap");
   const usageWrap = document.getElementById("bulkUsageWrap");
   const damageWrap = document.getElementById("bulkDamageSourceWrap");
-  const needsWarehouse = ["Nhập kho", "Điều chuyển kho", "Báo hỏng / Đi bảo hành", "Thu hồi về kho", "Chuyển sang sửa chữa"].includes(type);
+  const needsWarehouse = ["Nhập kho", "Điều chuyển kho", "Báo hỏng / Đi bảo hành", "Thu hồi về kho", "Chuyển sang sửa chữa", "Báo thanh lý"].includes(type);
   const needsUsage = ["Xuất kho sử dụng", "Điều chuyển nơi sử dụng"].includes(type);
   if (warehouseWrap) warehouseWrap.classList.toggle("hidden", !needsWarehouse);
   if (usageWrap) usageWrap.classList.toggle("hidden", !needsUsage);
