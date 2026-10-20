@@ -29,46 +29,52 @@
 
   <!-- GIAO DIỆN CHÍNH -->
   <div id="app" class="hidden">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo">K</div>
-        <div>
-          <b>Kho tài sản & vật tư</b>
-          <small id="userRoleBadge" class="muted">Quản trị viên</small>
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-top">
+        <div class="brand">
+          <div class="logo">K</div>
+          <div class="brand-copy">
+            <b>Kho tài sản & vật tư</b>
+            <small id="userRoleBadge" class="muted">Quản trị viên</small>
+          </div>
         </div>
+        <button type="button" id="sidebarToggle" class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Thu gọn menu" title="Thu gọn menu" aria-expanded="true">
+          <span class="toggle-glyph" aria-hidden="true">‹</span>
+          <span class="toggle-label">Thu gọn</span>
+        </button>
       </div>
       <nav class="nav-menu">
-        <button class="nav-btn active" onclick="showView('dashboard')">
+        <button class="nav-btn active" title="Tổng quan" aria-label="Tổng quan" onclick="showView('dashboard')">
           <span class="icon">📊</span> <span>Tổng quan</span>
         </button>
-        <button class="nav-btn" onclick="showView('devices')">
+        <button class="nav-btn" title="Thiết bị" aria-label="Thiết bị" onclick="showView('devices')">
           <span class="icon">💻</span> <span>Thiết bị</span>
         </button>
-        <button class="nav-btn" onclick="showView('locations')">
+        <button class="nav-btn" title="Kho lưu trữ" aria-label="Kho lưu trữ" onclick="showView('locations')">
           <span class="icon">🏢</span> <span>Kho lưu trữ</span>
         </button>
-        <button class="nav-btn" onclick="showView('usageLocations')">
+        <button class="nav-btn" title="Nơi sử dụng" aria-label="Nơi sử dụng" onclick="showView('usageLocations')">
           <span class="icon">📍</span> <span>Nơi sử dụng</span>
         </button>
-        <button class="nav-btn" onclick="showView('categories')">
+        <button class="nav-btn" title="Danh mục" aria-label="Danh mục" onclick="showView('categories')">
           <span class="icon">📁</span> <span>Danh mục</span>
         </button>
-        <button class="nav-btn" onclick="showView('movements')">
+        <button class="nav-btn" title="Xuất / Nhập / Sự cố" aria-label="Xuất / Nhập / Sự cố" onclick="showView('movements')">
           <span class="icon">🔄</span> <span>Xuất / Nhập / Sự cố</span>
         </button>
-        <button class="nav-btn" onclick="showView('disposition')">
+        <button class="nav-btn" title="Theo dõi hỏng / thanh lý" aria-label="Theo dõi hỏng / thanh lý" onclick="showView('disposition')">
           <span class="icon">🧰</span> <span>Theo dõi hỏng / thanh lý</span>
         </button>
-        <button class="nav-btn" onclick="showView('reports')">
+        <button class="nav-btn" title="Báo cáo & Nhập Excel" aria-label="Báo cáo & Nhập Excel" onclick="showView('reports')">
           <span class="icon">📑</span> <span>Báo cáo & Nhập Excel</span>
         </button>
-        <button class="nav-btn admin-only" onclick="showView('users')">
+        <button class="nav-btn admin-only" title="Người dùng" aria-label="Người dùng" onclick="showView('users')">
           <span class="icon">👥</span> <span>Người dùng</span>
         </button>
       </nav>
       <div class="sidebar-footer">
-        <div id="currentUserName" class="user-name">Admin</div>
-        <button onclick="handleLogout()" class="secondary logout-btn">Đăng xuất</button>
+        <div id="currentUserName" class="user-name" title="Tài khoản đang đăng nhập">Admin</div>
+        <button onclick="handleLogout()" class="secondary logout-btn" title="Đăng xuất" aria-label="Đăng xuất"><span class="logout-icon" aria-hidden="true">↪</span><span class="logout-label">Đăng xuất</span></button>
       </div>
     </aside>
 
@@ -107,6 +113,32 @@
           </div>
         </div>
 
+        <div class="card dashboard-quick-card">
+          <div class="dashboard-section-heading">
+            <div><h3>Thao tác nhanh</h3><p class="muted">Các công việc thường dùng, không cần tìm trong menu.</p></div>
+          </div>
+          <div class="quick-actions">
+            <button class="primary admin-only" onclick="openDeviceModal()">＋ Thêm tài sản / vật tư</button>
+            <button class="secondary admin-only" onclick="openMovementModal()">↔ Tạo phiếu đơn lẻ</button>
+            <button class="secondary admin-only" onclick="openBulkMovementModal()">☑ Phiếu nhiều thiết bị</button>
+            <button class="secondary" onclick="showView('disposition')">⚠ Theo dõi hỏng / thanh lý</button>
+            <button class="secondary" onclick="exportDevicesCSV()">↓ Xuất danh sách CSV</button>
+          </div>
+        </div>
+
+        <div class="card dashboard-recent-card">
+          <div class="dashboard-section-heading">
+            <div><h3>Giao dịch gần đây</h3><p class="muted">Các phiếu mới nhất, bao gồm cả phiếu đã hủy để tiện đối chiếu.</p></div>
+            <button class="secondary" onclick="showView('movements')">Xem toàn bộ lịch sử →</button>
+          </div>
+          <div class="table-card">
+            <table class="table dashboard-recent-table">
+              <thead><tr><th>Thời gian</th><th>Mã thiết bị</th><th>Nghiệp vụ</th><th>Từ → Đến</th><th>Người thực hiện</th><th>Trạng thái</th></tr></thead>
+              <tbody id="dashboardRecentMovements"><tr><td colspan="6" class="muted">Chưa có giao dịch.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="card" style="margin-top:16px; padding:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
             <div>
@@ -138,6 +170,15 @@
             </select>
             <select id="filterLocation" onchange="renderDevices()">
               <option value="">-- Tất cả vị trí & kho --</option>
+            </select>
+            <select id="filterDeviceStatus" onchange="renderDevices()" aria-label="Lọc theo tình trạng">
+              <option value="">-- Tất cả tình trạng --</option>
+              <option value="stock">Có trong kho</option>
+              <option value="usage">Đang sử dụng</option>
+              <option value="damaged">Hỏng / bảo hành</option>
+              <option value="repair">Đang sửa chữa</option>
+              <option value="disposed">Đã thanh lý</option>
+              <option value="empty">Hết tồn hoạt động</option>
             </select>
             <button class="secondary" onclick="resetFilters()">Đặt lại</button>
           </div>
@@ -249,6 +290,19 @@
             <button class="secondary admin-only" onclick="openBulkMovementModal()">☑ Tạo phiếu nhiều thiết bị</button>
           </div>
         </div>
+        <div class="movement-filters card">
+          <input id="movementSearch" type="search" placeholder="Tìm mã, phiếu, vị trí, người thực hiện, ghi chú..." oninput="renderMovements()" aria-label="Tìm trong lịch sử">
+          <select id="movementTypeFilter" onchange="renderMovements()" aria-label="Lọc loại nghiệp vụ">
+            <option value="">Tất cả nghiệp vụ</option>
+            <option>Nhập kho</option><option>Xuất kho sử dụng</option><option>Điều chuyển kho</option><option>Thu hồi về kho</option><option>Điều chuyển nơi sử dụng</option><option>Báo hỏng / Đi bảo hành</option><option>Chuyển sang sửa chữa</option><option>Đã sửa xong / Nhập lại kho</option><option>Báo thanh lý</option>
+          </select>
+          <select id="movementStatusFilter" onchange="renderMovements()" aria-label="Lọc trạng thái phiếu">
+            <option value="">Tất cả trạng thái</option><option value="active">Chưa hủy</option><option value="cancelled">Đã hủy</option>
+          </select>
+          <button class="secondary" onclick="resetMovementFilters()">Đặt lại</button>
+          <button class="secondary" onclick="exportMovementsCSV()">Xuất CSV theo bộ lọc</button>
+          <span class="muted" id="movementResultCount">Hiển thị 0 phiếu</span>
+        </div>
         <div class="card table-card">
           <table class="table">
             <thead>
@@ -292,7 +346,8 @@
             <option value="Đang sửa chữa">Đang sửa chữa</option>
             <option value="Sửa chữa tại nơi sử dụng">Sửa chữa tại nơi sử dụng</option>
           </select>
-          <button class="secondary" onclick="document.getElementById('dispositionSearch').value='';document.getElementById('dispositionTypeFilter').value='';renderDisposition();">Đặt lại</button>
+          <select id="dispositionLocationFilter" onchange="renderDisposition()" aria-label="Lọc theo kho/vị trí"><option value="">-- Tất cả kho/vị trí --</option></select>
+          <button class="secondary" onclick="resetDispositionFilters()">Đặt lại</button>
         </div>
         <p class="muted" id="dispositionResultCount">Hiển thị 0 dòng quản lý xử lý</p>
         <div class="card table-card">
@@ -310,7 +365,7 @@
           <p class="muted" style="margin-top: 5px;">Tải dữ liệu ra file Excel hoặc nạp hàng loạt hàng trăm thiết bị cùng lúc</p>
           <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:1.5rem;">
             <button class="primary" onclick="exportDevicesCSV()">📤 Xuất danh sách thiết bị (.CSV)</button>
-            <button class="secondary" onclick="exportMovementsCSV()">📤 Xuất lịch sử điều chuyển (.CSV)</button>
+            <button class="secondary" onclick="exportAllMovementsCSV()">📤 Xuất toàn bộ lịch sử điều chuyển (.CSV)</button>
             <button class="secondary" onclick="downloadSampleCSV()">📄 Tải file CSV mẫu nhập liệu</button>
             <button class="secondary admin-only" onclick="triggerImportCSV()">📥 Nạp dữ liệu từ file CSV</button>
           </div>
