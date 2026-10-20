@@ -176,7 +176,8 @@ const VIEW_TITLES = {
   movements: "Lịch sử điều chuyển & sự cố",
   disposition: "Theo dõi hỏng / sửa chữa / thanh lý",
   reports: "Báo cáo & Nhập Excel",
-  users: "Quản trị người dùng"
+  users: "Quản trị người dùng",
+  guide: "Hướng dẫn nghiệp vụ"
 };
 
 function navigateViewHistory(direction) {
