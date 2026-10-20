@@ -56,6 +56,9 @@
         <button class="nav-btn" onclick="showView('movements')">
           <span class="icon">🔄</span> <span>Xuất / Nhập / Sự cố</span>
         </button>
+        <button class="nav-btn" onclick="showView('disposition')">
+          <span class="icon">🧰</span> <span>Theo dõi hỏng / thanh lý</span>
+        </button>
         <button class="nav-btn" onclick="showView('reports')">
           <span class="icon">📑</span> <span>Báo cáo & Nhập Excel</span>
         </button>
@@ -264,6 +267,42 @@
         </div>
       </section>
 
+      <!-- TAB THEO DÕI HỎNG / SỬA CHỮA / THANH LÝ -->
+      <section id="disposition" class="view hidden">
+        <div class="toolbar">
+          <div>
+            <h2>Theo dõi thiết bị hỏng, bảo hành, sửa chữa và thanh lý</h2>
+            <p class="muted">Theo dõi kho/vị trí lưu giữ hiện tại và xuất danh sách CSV để kiểm kê, bàn giao hoặc lập hồ sơ thanh lý.</p>
+          </div>
+          <button class="primary" onclick="exportDispositionCSV()">📤 Xuất danh sách đang lọc (.CSV)</button>
+        </div>
+        <div class="dashboard-grid" style="margin-bottom:14px;">
+          <div class="stat-card"><div class="stat-label">Tổng số lượng cần xử lý</div><div class="stat-value" id="dispositionTotal">0</div></div>
+          <div class="stat-card"><div class="stat-label">Thiết bị/vật tư thanh lý</div><div class="stat-value" id="dispositionDisposed">0</div></div>
+          <div class="stat-card"><div class="stat-label">Hỏng / bảo hành</div><div class="stat-value" id="dispositionDamaged">0</div></div>
+          <div class="stat-card"><div class="stat-label">Đang sửa chữa</div><div class="stat-value" id="dispositionRepair">0</div></div>
+        </div>
+        <div class="filter-bar">
+          <input id="dispositionSearch" type="text" placeholder="Tìm mã, tên, danh mục, kho/vị trí..." oninput="renderDisposition()">
+          <select id="dispositionTypeFilter" onchange="renderDisposition()">
+            <option value="">-- Tất cả nghiệp vụ --</option>
+            <option value="Thanh lý">Thanh lý</option>
+            <option value="Hỏng / Bảo hành">Hỏng / Bảo hành</option>
+            <option value="Hỏng tại nơi sử dụng">Hỏng tại nơi sử dụng</option>
+            <option value="Đang sửa chữa">Đang sửa chữa</option>
+            <option value="Sửa chữa tại nơi sử dụng">Sửa chữa tại nơi sử dụng</option>
+          </select>
+          <button class="secondary" onclick="document.getElementById('dispositionSearch').value='';document.getElementById('dispositionTypeFilter').value='';renderDisposition();">Đặt lại</button>
+        </div>
+        <p class="muted" id="dispositionResultCount">Hiển thị 0 dòng quản lý xử lý</p>
+        <div class="card table-card">
+          <table class="table">
+            <thead><tr><th>Mã</th><th>Tên thiết bị/vật tư</th><th>Danh mục</th><th>Nghiệp vụ</th><th>Kho/vị trí quản lý</th><th>Số lượng</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+            <tbody id="dispositionTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- TAB 6: BÁO CÁO & XUẤT NHẬP EXCEL -->
       <section id="reports" class="view hidden">
         <div class="card" style="padding: 2rem;">
@@ -386,7 +425,7 @@
           <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
           <option value="Báo thanh lý">Thanh lý / loại khỏi sử dụng</option>
         </select>
-        <div id="movDamageSourceWrap" class="hidden"><label>Nguồn hàng cần xử lý</label><select id="movDamageSourceType" onchange="handleMovementTypeChange()"><option value="warehouse">Từ kho</option><option value="usage">Từ nơi sử dụng</option></select></div>
+        <div id="movDamageSourceWrap" class="hidden"><label>Nguồn hàng cần xử lý</label><select id="movDamageSourceType" onchange="handleMovementTypeChange()"><option value="warehouse">Từ kho còn tốt</option><option value="usage">Từ nơi sử dụng</option><option value="damaged">Từ kho hỏng / bảo hành</option><option value="repair">Từ kho đang sửa chữa</option></select></div>
         <div id="movFromWarehouseWrap"><label>Kho nguồn</label><select id="movFromLocation" onchange="handleMovementTypeChange()"></select><small id="movAvailableQty" class="muted"></small></div>
         <div id="movFromUsageWrap" class="hidden"><label>Nơi sử dụng nguồn</label><select id="movFromUsageLocation" onchange="handleMovementTypeChange()"></select></div>
         <div id="movToWarehouseWrap"><label>Kho nhận / kho đích</label><select id="movToLocation"></select></div>
