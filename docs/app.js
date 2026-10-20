@@ -138,6 +138,17 @@ function initSidebar() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  if (!window.history.state || !window.history.state.khoView) {
+    window.history.replaceState({ khoView: "dashboard", khoViewIndex: 0 }, "", `${window.location.pathname}${window.location.search}#dashboard`);
+  }
+  window.__khoViewMaxIndex = Number.isInteger(window.history.state?.khoViewIndex) ? window.history.state.khoViewIndex : 0;
+  window.addEventListener("popstate", event => {
+    const viewId = event.state?.khoView;
+    if (viewId && document.getElementById(viewId)) {
+      showView(viewId, { history: false });
+      updateViewHistoryButtons();
+    }
+  });
   initSidebar();
   const token = localStorage.getItem("kho_token");
   const cachedUser = localStorage.getItem("kho_user");
@@ -156,7 +167,39 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-function showView(viewId) {
+const VIEW_TITLES = {
+  dashboard: "Tổng quan",
+  devices: "Danh sách tài sản & vật tư",
+  locations: "Kho lưu trữ",
+  usageLocations: "Nơi sử dụng",
+  categories: "Danh mục thiết bị",
+  movements: "Lịch sử điều chuyển & sự cố",
+  disposition: "Theo dõi hỏng / sửa chữa / thanh lý",
+  reports: "Báo cáo & Nhập Excel",
+  users: "Quản trị người dùng"
+};
+
+function navigateViewHistory(direction) {
+  if (direction < 0) window.history.back();
+  else window.history.forward();
+}
+
+function updateViewHistoryButtons() {
+  const back = document.getElementById("viewBackBtn");
+  const forward = document.getElementById("viewForwardBtn");
+  const state = window.history.state || {};
+  if (back) back.disabled = !(Number.isInteger(state.khoViewIndex) && state.khoViewIndex > 0);
+  if (forward) forward.disabled = !(Number.isInteger(state.khoViewIndex) && state.khoViewIndex < (window.__khoViewMaxIndex || state.khoViewIndex));
+}
+
+function showView(viewId, options = {}) {
+  if (!document.getElementById(viewId)) return;
+  if (options.history !== false) {
+    const currentState = window.history.state || {};
+    let index = Number.isInteger(currentState.khoViewIndex) ? currentState.khoViewIndex + 1 : 1;
+    window.__khoViewMaxIndex = index;
+    window.history.pushState({ khoView: viewId, khoViewIndex: index }, "", `#${viewId}`);
+  }
   document.querySelectorAll(".view").forEach(v => {
     v.classList.add("hidden");
     v.style.display = "none";
@@ -172,19 +215,12 @@ function showView(viewId) {
   const btn = Array.from(document.querySelectorAll(".nav-btn")).find(b => b.getAttribute("onclick")?.includes(viewId));
   if (btn) btn.classList.add("active");
 
-  const titles = {
-    dashboard: "Tổng quan",
-    devices: "Danh sách tài sản & vật tư",
-    locations: "Kho lưu trữ",
-    usageLocations: "Nơi sử dụng",
-    categories: "Danh mục thiết bị",
-    movements: "Lịch sử điều chuyển & sự cố",
-    disposition: "Theo dõi hỏng / sửa chữa / thanh lý",
-    reports: "Báo cáo & Nhập Excel",
-    users: "Quản trị người dùng"
-  };
+  const title = VIEW_TITLES[viewId] || "Kho";
   const titleEl = document.getElementById("pageTitle");
-  if (titleEl) titleEl.innerText = titles[viewId] || "Kho";
+  const labelEl = document.getElementById("currentViewLabel");
+  if (titleEl) titleEl.innerText = title;
+  if (labelEl) labelEl.innerText = title;
+  updateViewHistoryButtons();
 
   if (viewId === "users") loadUsers();
   if (viewId === "categories") renderCategories();
