@@ -356,3 +356,59 @@ input,select { min-height:38px; }
   .report-table-heading { align-items:flex-start; flex-direction:column; }
   .report-detail-card table { min-width:1000px; }
 }
+
+/* V5.2.4 — thu gọn khu vực Theo dõi hỏng / sửa chữa / thanh lý */
+#disposition > .dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0 !important;
+}
+#disposition > .dashboard-grid .stat-card {
+  min-height: 0;
+  padding: 13px 16px;
+  border: 1px solid var(--border);
+  border-top: 3px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+#disposition > .dashboard-grid .stat-card:nth-child(1) { border-top-color: #2563eb; }
+#disposition > .dashboard-grid .stat-card:nth-child(2) { border-top-color: #7c3aed; }
+#disposition > .dashboard-grid .stat-card:nth-child(3) { border-top-color: #ea580c; }
+#disposition > .dashboard-grid .stat-card:nth-child(4) { border-top-color: #0891b2; }
+#disposition > .dashboard-grid .stat-label { font-size: .84rem; line-height: 1.35; color: var(--text-muted); }
+#disposition > .dashboard-grid .stat-value { flex: 0 0 auto; font-size: 1.65rem; line-height: 1; font-weight: 750; color: #0f172a; }
+#disposition .filter-bar { margin-top: 10px; }
+#disposition #dispositionResultCount { margin: 6px 0 8px; }
+#disposition .table th, #disposition .table td { padding: 10px 12px; }
+@media (max-width: 900px) {
+  #disposition > .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  #disposition > .dashboard-grid { gap: 8px; }
+  #disposition > .dashboard-grid .stat-card { padding: 11px 12px; gap: 8px; }
+  #disposition > .dashboard-grid .stat-label { font-size: .78rem; }
+  #disposition > .dashboard-grid .stat-value { font-size: 1.4rem; }
+}
+
+/* V5.2.5: điều hướng Back/Forward và hiển thị vị trí menu hiện tại */
+.page-heading-wrap { min-width: 0; }
+.page-heading-line { display: flex; align-items: center; gap: 12px; }
+.page-history-controls { display: flex; gap: 6px; flex: 0 0 auto; }
+.icon-nav-btn { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+.icon-nav-btn:disabled { opacity: .38; cursor: not-allowed; }
+.page-title-group { min-width: 0; }
+.page-title-group h1 { margin: 0; }
+.page-breadcrumb { margin-top: 4px; color: var(--muted, #64748b); font-size: .78rem; line-height: 1.35; }
+.page-breadcrumb strong { color: var(--primary, #1d4ed8); font-weight: 650; }
+@media (max-width: 600px) {
+  .page-heading-line { gap: 8px; }
+  .page-history-controls { gap: 4px; }
+  .icon-nav-btn { width: 34px; height: 34px; }
+  .page-breadcrumb { font-size: .72rem; }
+}
