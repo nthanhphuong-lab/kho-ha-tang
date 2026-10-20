@@ -190,6 +190,7 @@ function showView(viewId) {
   if (viewId === "categories") renderCategories();
   if (viewId === "locations") renderLocations();
   if (viewId === "usageLocations") renderUsageLocations();
+  if (viewId === "reports") renderCustodyReport();
 }
 
 async function handleLogin(e) {
@@ -289,6 +290,7 @@ async function loadState() {
     renderCategories();
     renderLocations();
     renderUsageLocations();
+    renderCustodyReport();
 
     if (statusEl) statusEl.innerText = "Đã đồng bộ";
   } catch (err) {
@@ -300,6 +302,127 @@ function sumQtyMap(map) { return Object.values(map || {}).reduce((sum, n) => sum
 function deviceStockQuantity(d) { return d.trackingMode === "quantity" ? sumQtyMap(d.stockByLocation) : (d.status === "Trong kho" ? 1 : 0); }
 function deviceUsageQuantity(d) { return d.trackingMode === "quantity" ? sumQtyMap(d.usageByLocation) : (d.status === "Đang sử dụng" ? 1 : 0); }
 function deviceDamagedQuantity(d) { return d.trackingMode === "quantity" ? sumQtyMap(d.damagedByLocation) + sumQtyMap(d.usageDamagedByLocation) + sumQtyMap(d.repairByLocation) + sumQtyMap(d.usageRepairByLocation) : (/Hỏng|Bảo hành|Đang sửa chữa/i.test(d.status || "") ? 1 : 0); }
+
+// Phân trang dùng chung: mặc định 10 dòng, cho phép 10/25/50 dòng mỗi trang.
+const TABLE_PAGE_SIZE = 10;
+const tablePageState = Object.create(null);
+
+function applyTablePagination(tbodyId, key, defaultPageSize = TABLE_PAGE_SIZE) {
+  const tbody = document.getElementById(tbodyId);
+  const table = tbody?.closest("table");
+  if (!tbody || !table) return;
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const dataRows = rows.filter(row => !row.querySelector(".empty-state") && !row.querySelector("[data-empty-row]") && !row.querySelector("td[colspan]"));
+  const host = table.closest(".table-card") || table.parentElement;
+  if (!host) return;
+  let pager = host.querySelector(`.table-pagination[data-page-key="${key}"]`);
+  if (!pager) {
+    pager = document.createElement("div");
+    pager.className = "table-pagination";
+    pager.dataset.pageKey = key;
+    host.appendChild(pager);
+  }
+  if (!tablePageState[key]) tablePageState[key] = { page: 1, size: defaultPageSize };
+  const state = tablePageState[key];
+  const size = Math.max(1, Number(state.size) || defaultPageSize);
+  const total = dataRows.length;
+  const pages = Math.max(1, Math.ceil(total / size));
+  state.page = Math.min(Math.max(1, Number(state.page) || 1), pages);
+
+  if (total <= size) {
+    dataRows.forEach(row => row.style.display = "");
+    rows.filter(row => !dataRows.includes(row)).forEach(row => row.style.display = "");
+    pager.innerHTML = `<span class="pagination-summary">${total ? `Hiển thị ${total} dòng` : "Không có dữ liệu"}</span>`;
+    pager.classList.toggle("pagination-empty", total === 0);
+    return;
+  }
+  const start = (state.page - 1) * size;
+  const end = Math.min(start + size, total);
+  dataRows.forEach((row, index) => row.style.display = index >= start && index < end ? "" : "none");
+  rows.filter(row => !dataRows.includes(row)).forEach(row => row.style.display = "");
+  pager.classList.remove("pagination-empty");
+  pager.innerHTML = `
+    <span class="pagination-summary">Dòng ${start + 1}–${end} / ${total}</span>
+    <label class="pagination-size">Mỗi trang
+      <select aria-label="Số dòng mỗi trang" data-page-size="${key}">
+        ${[10,25,50].map(n => `<option value="${n}" ${size === n ? "selected" : ""}>${n}</option>`).join("")}
+      </select>
+    </label>
+    <div class="pagination-buttons">
+      <button type="button" class="secondary" data-page-action="first" data-page-key="${key}" ${state.page <= 1 ? "disabled" : ""} aria-label="Trang đầu">«</button>
+      <button type="button" class="secondary" data-page-action="prev" data-page-key="${key}" ${state.page <= 1 ? "disabled" : ""}>Trước</button>
+      <span class="pagination-current">Trang ${state.page} / ${pages}</span>
+      <button type="button" class="secondary" data-page-action="next" data-page-key="${key}" data-pages="${pages}" ${state.page >= pages ? "disabled" : ""}>Sau</button>
+      <button type="button" class="secondary" data-page-action="last" data-page-key="${key}" data-pages="${pages}" ${state.page >= pages ? "disabled" : ""} aria-label="Trang cuối">»</button>
+    </div>`;
+  if (!pager.dataset.bound) {
+    pager.dataset.bound = "1";
+    pager.addEventListener("click", event => {
+      const button = event.target.closest("[data-page-action]");
+      if (!button || button.disabled) return;
+      const k = button.dataset.pageKey, s = tablePageState[k];
+      if (!s) return;
+      const max = Number(button.dataset.pages) || Math.max(1, Math.ceil((document.getElementById(tbodyId)?.querySelectorAll("tr")?.length || 0) / s.size));
+      if (button.dataset.pageAction === "first") s.page = 1;
+      if (button.dataset.pageAction === "prev") s.page = Math.max(1, s.page - 1);
+      if (button.dataset.pageAction === "next") s.page = Math.min(max, s.page + 1);
+      if (button.dataset.pageAction === "last") s.page = max;
+      applyTablePagination(tbodyId, k, defaultPageSize);
+    });
+    pager.addEventListener("change", event => {
+      const select = event.target.closest("[data-page-size]");
+      if (!select) return;
+      const k = select.dataset.pageSize;
+      if (!tablePageState[k]) tablePageState[k] = { page: 1, size: defaultPageSize };
+      tablePageState[k].size = Number(select.value) || defaultPageSize;
+      tablePageState[k].page = 1;
+      applyTablePagination(tbodyId, k, defaultPageSize);
+    });
+  }
+}
+
+
+function renderDashboardAlerts() {
+  const grid = document.getElementById("dashboardAlertsGrid");
+  if (!grid) return;
+  const low = STATE.devices.filter(d => d.trackingMode === "quantity" && deviceStockQuantity(d) > 0 && deviceStockQuantity(d) <= 2);
+  const noGood = STATE.devices.filter(d => d.trackingMode === "quantity" && deviceStockQuantity(d) <= 0 &&
+    (deviceUsageQuantity(d) + deviceDamagedQuantity(d) + sumQtyMap(d.repairByLocation) + sumQtyMap(d.usageRepairByLocation) > 0));
+  const damaged = STATE.devices.filter(d => d.trackingMode === "quantity"
+    ? sumQtyMap(d.damagedByLocation) + sumQtyMap(d.usageDamagedByLocation) > 0
+    : /hỏng|bảo hành/i.test(d.status || ""));
+  const repair = STATE.devices.filter(d => d.trackingMode === "quantity"
+    ? sumQtyMap(d.repairByLocation) + sumQtyMap(d.usageRepairByLocation) > 0
+    : /đang sửa chữa/i.test(d.status || ""));
+  const cards = [
+    {key:"low", icon:"📉", title:"Vật tư sắp hết", detail:"Tồn tốt từ 1–2 đơn vị", count:low.length, tone:"warning"},
+    {key:"empty", icon:"📦", title:"Hết tồn tốt", detail:"Không còn hàng tốt để cấp phát", count:noGood.length, tone:"danger"},
+    {key:"damaged", icon:"⚠️", title:"Hỏng / bảo hành", detail:"Cần xử lý hoặc theo dõi", count:damaged.length, tone:"danger"},
+    {key:"repair", icon:"🛠️", title:"Đang sửa chữa", detail:"Đang sửa hoặc chờ bảo hành", count:repair.length, tone:"info"}
+  ];
+  grid.innerHTML = cards.map(c => `<button type="button" class="dashboard-alert-card alert-${c.tone}" data-dashboard-alert="${c.key}">
+    <span class="dashboard-alert-icon" aria-hidden="true">${c.icon}</span>
+    <span class="dashboard-alert-copy"><strong>${c.title}</strong><small>${c.detail}</small></span>
+    <span class="dashboard-alert-count">${Number(c.count).toLocaleString("vi-VN")}</span>
+  </button>`).join("");
+}
+
+function openDashboardAlert(kind) {
+  if (kind === "low" || kind === "empty") {
+    showView("devices");
+    const status = document.getElementById("filterDeviceStatus");
+    if (status) status.value = kind === "low" ? "lowStock" : "noGoodStock";
+    ["deviceSearch","filterCategory","filterLocation"].forEach(id => { const el=document.getElementById(id); if(el) el.value=""; });
+    renderDevices();
+    return;
+  }
+  showView("disposition");
+  const type = document.getElementById("dispositionTypeFilter");
+  if (type) type.value = kind === "damaged" ? "Hỏng / Bảo hành" : "Đang sửa chữa";
+  ["dispositionSearch","dispositionLocationFilter"].forEach(id => { const el=document.getElementById(id); if(el) el.value=""; });
+  renderDisposition();
+}
+
 function renderDashboard() {
   const total = document.getElementById("statTotalDevices");
   const qtyOf = d => Number.isFinite(Number(d.quantity)) && d.quantity !== "" ? Number(d.quantity) : 1;
@@ -312,13 +435,14 @@ function renderDashboard() {
   if (faulty) faulty.innerText = STATE.devices.reduce((sum, d) => sum + deviceDamagedQuantity(d), 0).toLocaleString("vi-VN");
   renderDashboardLocations();
   renderDashboardUsageLocations();
+  renderDashboardAlerts();
   renderDashboardRecentMovements();
 }
 
 function renderDashboardRecentMovements() {
   const body = document.getElementById("dashboardRecentMovements");
   if (!body) return;
-  const rows = (STATE.movements || []).slice(0, 8);
+  const rows = (STATE.movements || []).slice(0, 3);
   body.innerHTML = rows.map(m => {
     const cancelled = Boolean(m.cancelled || m.cancelledAt);
     const from = m.fromLocation || m.fromUsageLocation || "—";
@@ -455,6 +579,8 @@ function deviceMatchesStatusFilter(d, filter) {
   if (filter === "repair") return repair > 0;
   if (filter === "disposed") return disposed > 0;
   if (filter === "empty") return stock + usage + damaged + repair <= 0;
+  if (filter === "lowStock") return d.trackingMode === "quantity" && stock > 0 && stock <= 2;
+  if (filter === "noGoodStock") return d.trackingMode === "quantity" && stock <= 0 && (usage + damaged + repair > 0);
   return true;
 }
 
@@ -535,6 +661,7 @@ function renderDevices() {
         </td>` : "<td></td>"}
       </tr>`;
   }).join("") || `<tr><td colspan="10" class="muted empty-state">Không tìm thấy tài sản/vật tư phù hợp. Hãy thử bỏ bớt bộ lọc hoặc tìm theo mã quản lý.</td></tr>`;
+  applyTablePagination("deviceTableBody", "devices");
   updateFloatingBar();
 }
 function toggleSelectDevice(code, isChecked) {
@@ -877,6 +1004,7 @@ function renderMovements() {
       ${isAdmin ? `<td><div style="display:flex;gap:6px;flex-wrap:wrap;">${canCancel ? `<button type="button" class="danger" data-act="cancel-movement" data-val="${escapeAttr(m.id)}" style="color:#b91c1c;">Hủy & hoàn tác</button>` : isCancelled ? `<span class="muted">Đã hủy</span>` : `<button type="button" disabled title="Phiếu cũ thiếu ảnh chụp dữ liệu trước/sau, không thể hoàn tác an toàn">Không thể hoàn tác</button>`}<button type="button" class="secondary" data-act="delete-movement" data-val="${escapeAttr(m.id)}" title="Chỉ xóa nhật ký, không thay đổi dữ liệu thiết bị">Xóa lịch sử</button></div></td>` : ""}
     </tr>`;
   }).join("") || `<tr><td colspan="8" class="muted empty-state">Không tìm thấy phiếu phù hợp với bộ lọc.</td></tr>`;
+  applyTablePagination("movementTableBody", "movements");
   const table = tbody.closest("table");
   const headRow = table?.querySelector("thead tr");
   if (headRow) {
@@ -976,6 +1104,7 @@ function renderDisposition() {
   set("dispositionTotal", counts.total); set("dispositionDisposed", counts.disposed); set("dispositionDamaged", counts.damaged); set("dispositionRepair", counts.repair);
   body.innerHTML = filtered.map(r => `<tr><td><b>${escapeHtml(r.code)}</b></td><td>${escapeHtml(r.name||"")}</td><td>${escapeHtml(r.category||"")}</td><td><span class="badge ${r.type==="Thanh lý"?"badge-danger":"badge-secondary"}">${escapeHtml(r.type)}</span></td><td><b>${escapeHtml(r.location)}</b></td><td>${Number(r.quantity).toLocaleString("vi-VN")} ${escapeHtml(r.unit)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note)}</td></tr>`).join("") || `<tr><td colspan="8" class="muted" style="text-align:center;padding:20px;">Không có thiết bị/vật tư phù hợp.</td></tr>`;
   const count = document.getElementById("dispositionResultCount"); if(count) count.textContent=`Hiển thị ${filtered.length} dòng quản lý xử lý`;
+  applyTablePagination("dispositionTableBody", "disposition");
 }
 function exportDispositionCSV() {
   const rows = getFilteredDispositionRows();
@@ -993,6 +1122,7 @@ function renderLocations() {
     const count = STATE.devices.reduce((sum, d) => sum + (d.trackingMode === "quantity" ? Number((d.stockByLocation || {})[loc] || 0) + Number((d.damagedByLocation || {})[loc] || 0) + Number((d.repairByLocation || {})[loc] || 0) + Number((d.disposedByLocation || {})[loc] || 0) : (d.status !== "Đang sử dụng" && d.location === loc ? 1 : 0)), 0);
     return `<tr><td>${idx + 1}</td><td><b>${escapeHtml(loc)}</b></td><td><span class="badge badge-secondary">${count.toLocaleString("vi-VN")} đơn vị</span></td>${isAdmin ? `<td style="text-align:right;"><button type="button" data-act="rename-loc" data-val="${escapeAttr(loc)}">Đổi tên</button> <button type="button" data-act="del-loc" data-val="${escapeAttr(loc)}" style="color:red">Xóa</button></td>` : `<td></td>`}</tr>`;
   }).join("");
+  applyTablePagination("locationTableBody", "locations");
 }
 async function openAddLocationModal() { const name = prompt("Nhập tên kho lưu trữ mới:"); if (!name || !name.trim()) return; try { await callMutate("location.add", { name: name.trim() }); await loadState(); } catch(e) {} }
 async function renameLocation(oldName) { const newName = prompt(`Đổi tên kho "${oldName}" thành:`, oldName); if (!newName || !newName.trim() || newName.trim() === oldName) return; try { await callMutate("location.update", { oldName, newName: newName.trim() }); await loadState(); } catch(e) {} }
@@ -1001,6 +1131,7 @@ function renderUsageLocations() {
   const tbody = document.getElementById("usageLocationTableBody"); if (!tbody) return;
   const isAdmin = STATE.currentUser?.role === "admin";
   tbody.innerHTML = STATE.usageLocations.map((l, idx) => { const name = l.name || l; const qty = STATE.devices.reduce((sum,d) => sum + getDeviceUsageAtLocation(d,name),0); return `<tr><td>${idx+1}</td><td><b>${escapeHtml(name)}</b></td><td>${escapeHtml(l.department || "-")}</td><td>${escapeHtml(l.manager || "-")}</td><td>${escapeHtml(l.address || "-")}</td><td><span class="badge badge-secondary">${qty.toLocaleString("vi-VN")}</span></td><td>${isAdmin ? (l.legacy ? `<button type="button" data-act="edit-usage-loc" data-val="${escapeAttr(name)}">Khai báo</button>` : `<button type="button" data-act="edit-usage-loc" data-val="${escapeAttr(l.id || name)}">Sửa</button> <button type="button" data-act="del-usage-loc" data-val="${escapeAttr(l.id || name)}" style="color:#b91c1c">Xóa</button>`) : (l.legacy ? `<span class="badge badge-danger">Chưa chuẩn hóa</span>` : "")}</td></tr>`; }).join("") || `<tr><td colspan="7" class="muted">Chưa có nơi sử dụng.</td></tr>`;
+  applyTablePagination("usageLocationTableBody", "usageLocations");
 }
 function openUsageLocationModal(idOrName = null) {
   const found = idOrName ? STATE.usageLocations.find(l => String(l.id || l.name || l) === String(idOrName) || String(l.name || l) === String(idOrName)) : null;
@@ -1036,6 +1167,7 @@ function renderCategories() {
       </tr>
     `;
   }).join("");
+  applyTablePagination("categoryTableBody", "categories");
 }
 
 async function openAddCategoryModal() {
@@ -1421,6 +1553,171 @@ function formatQtyMap(map, unit) {
   return Object.entries(map || {}).filter(([, qty]) => Number(qty) > 0)
     .map(([location, qty]) => `${location}: ${Number(qty).toLocaleString("vi-VN")} ${unit || "cái"}`).join("; ");
 }
+
+// ----------------------------------------------------
+// BÁO CÁO THEO ĐƠN VỊ / PHÒNG BAN / NGƯỜI ĐANG GIỮ
+// ----------------------------------------------------
+function custodyLocationInfo(location) {
+  const key = String(location || "").trim().toLowerCase();
+  return (STATE.usageLocations || []).find(item => String(item.name || item).trim().toLowerCase() === key) || null;
+}
+
+function latestCustodyMovement(device, usageLocation) {
+  const code = String(device.code || "").trim().toLowerCase();
+  const loc = String(usageLocation || "").trim().toLowerCase();
+  return (STATE.movements || [])
+    .filter(m => String(m.deviceCode || "").trim().toLowerCase() === code
+      && !(m.cancelled || m.cancelledAt)
+      && ["Xuất kho sử dụng", "Điều chuyển nơi sử dụng"].includes(String(m.type || ""))
+      && String(m.usageLocation || m.toUsageLocation || "").trim().toLowerCase() === loc)
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0] || null;
+}
+
+function buildCustodyReportRows() {
+  const rows = [];
+  const pushRow = (d, location, status, quantity, holderOverride = "", departmentOverride = "") => {
+    const info = custodyLocationInfo(location);
+    const movement = status === "Đang sử dụng" ? latestCustodyMovement(d, location) : null;
+    const department = String(departmentOverride || movement?.department || info?.department || "").trim() || "Chưa xác định";
+    const holder = String(holderOverride || movement?.recipient || (status === "Đang sử dụng" ? info?.manager : "") || "").trim() || "Chưa xác định";
+    rows.push({
+      code: String(d.code || ""),
+      name: String(d.name || d.code || ""),
+      model: String(d.model || ""),
+      serial: String(d.serial || ""),
+      category: String(d.category || "Chưa phân loại"),
+      status,
+      location: String(location || "Chưa xác định"),
+      department,
+      holder,
+      quantity: Math.max(0, Number(quantity) || 0),
+      unit: String(d.unit || "cái"),
+      trackingMode: d.trackingMode || "individual"
+    });
+  };
+
+  for (const d of STATE.devices || []) {
+    if (d.trackingMode !== "quantity") {
+      const status = String(d.status || "Chưa xác định");
+      const location = status === "Đang sử dụng" ? (d.usageLocation || d.location || "") : (d.location || d.usageLocation || "");
+      const info = custodyLocationInfo(location);
+      const movement = status === "Đang sử dụng" ? latestCustodyMovement(d, location) : null;
+      const department = String(movement?.department || info?.department || "").trim() || "Chưa xác định";
+      const holder = String(movement?.recipient || (status === "Đang sử dụng" ? info?.manager : "") || "").trim() || "Chưa xác định";
+      pushRow(d, location, status, 1, holder, department);
+      continue;
+    }
+
+    const groups = [
+      ["stockByLocation", "Trong kho"],
+      ["usageByLocation", "Đang sử dụng"],
+      ["damagedByLocation", "Hỏng / Bảo hành"],
+      ["usageDamagedByLocation", "Hỏng / Bảo hành"],
+      ["repairByLocation", "Đang sửa chữa"],
+      ["usageRepairByLocation", "Đang sửa chữa"],
+      ["disposedByLocation", "Thanh lý"]
+    ];
+    for (const [mapName, status] of groups) {
+      for (const [location, rawQty] of Object.entries(d[mapName] || {})) {
+        const quantity = Number(rawQty) || 0;
+        if (quantity <= 0) continue;
+        pushRow(d, location, status, quantity);
+      }
+    }
+    // Keep zero-stock SKU visible only if there is no location/status balance at all.
+    if (!rows.some(r => r.code.toLowerCase() === String(d.code || "").toLowerCase())) {
+      pushRow(d, d.location || "Chưa xác định", "Hết tồn", 0);
+    }
+  }
+  return rows;
+}
+
+function getFilteredCustodyReportRows() {
+  const q = String(document.getElementById("custodySearch")?.value || "").trim().toLowerCase();
+  const department = document.getElementById("custodyDepartmentFilter")?.value || "";
+  const holder = document.getElementById("custodyHolderFilter")?.value || "";
+  const status = document.getElementById("custodyStatusFilter")?.value || "";
+  return buildCustodyReportRows().filter(r => {
+    const text = [r.code,r.name,r.model,r.serial,r.category,r.location,r.department,r.holder,r.status]
+      .map(v => String(v || "").toLowerCase());
+    return (!q || text.some(v => v.includes(q)))
+      && (!department || r.department === department)
+      && (!holder || r.holder === holder)
+      && (!status || r.status === status);
+  });
+}
+
+function refreshCustodyReportFilters(rows) {
+  const update = (id, key, placeholder) => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const current = select.value;
+    const values = [...new Set(rows.map(r => r[key]).filter(Boolean))].sort((a,b) => a.localeCompare(b, "vi"));
+    select.innerHTML = `<option value="">${placeholder}</option>` + values.map(v => `<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join("");
+    if (values.includes(current)) select.value = current;
+  };
+  update("custodyDepartmentFilter", "department", "Tất cả đơn vị/phòng ban");
+  update("custodyHolderFilter", "holder", "Tất cả người giữ/phụ trách");
+}
+
+function renderCustodyReport() {
+  const body = document.getElementById("custodyReportBody");
+  if (!body) return;
+  const allRows = buildCustodyReportRows();
+  refreshCustodyReportFilters(allRows);
+  const rows = getFilteredCustodyReportRows();
+  const fmt = value => Number(value || 0).toLocaleString("vi-VN");
+  const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = fmt(value); };
+  set("custodyKpiRows", rows.length);
+  set("custodyKpiUsage", rows.filter(r => r.status === "Đang sử dụng").reduce((n,r) => n + r.quantity, 0));
+  set("custodyKpiNoHolder", rows.filter(r => r.status === "Đang sử dụng" && r.holder === "Chưa xác định").length);
+  set("custodyKpiDepartments", new Set(rows.map(r => r.department).filter(d => d !== "Chưa xác định")).size);
+
+  body.innerHTML = rows.map(r => `<tr>
+    <td><strong>${escapeHtml(r.code || "—")}</strong></td>
+    <td><div><strong>${escapeHtml(r.name || "—")}</strong></div>${r.serial ? `<small class="muted">${escapeHtml(r.serial)}</small>` : (r.model ? `<small class="muted">${escapeHtml(r.model)}</small>` : "")}</td>
+    <td>${escapeHtml(r.category)}</td>
+    <td><span class="badge ${r.status === "Hỏng / Bảo hành" || r.status === "Thanh lý" ? "badge-danger" : r.status === "Đang sử dụng" ? "badge-secondary" : r.status === "Đang sửa chữa" ? "badge-danger" : "badge-primary"}">${escapeHtml(r.status)}</span></td>
+    <td>${escapeHtml(r.location)}</td>
+    <td>${escapeHtml(r.department)}</td>
+    <td>${escapeHtml(r.holder)}</td>
+    <td><strong>${fmt(r.quantity)}</strong></td>
+    <td>${escapeHtml(r.unit)}</td>
+  </tr>`).join("") || `<tr><td colspan="9" class="muted empty-state">Không có tài sản/vật tư phù hợp với bộ lọc.</td></tr>`;
+  const count = document.getElementById("custodyReportCount");
+  if (count) count.textContent = `Hiển thị ${rows.length.toLocaleString("vi-VN")} / ${allRows.length.toLocaleString("vi-VN")} dòng báo cáo`;
+  const deptBody = document.getElementById("custodyDepartmentBody");
+  if (deptBody) {
+    const grouped = new Map();
+    rows.forEach(r => {
+      const key = r.department || "Chưa xác định";
+      if (!grouped.has(key)) grouped.set(key, { department:key, codes:new Set(), quantity:0, usage:0, exception:0 });
+      const g = grouped.get(key);
+      g.codes.add(r.code);
+      g.quantity += r.quantity;
+      if (r.status === "Đang sử dụng") g.usage += r.quantity;
+      if (["Hỏng / Bảo hành","Đang sửa chữa","Thanh lý"].includes(r.status)) g.exception += r.quantity;
+    });
+    deptBody.innerHTML = [...grouped.values()].sort((a,b) => b.quantity - a.quantity).map(g => `<tr>
+      <td><strong>${escapeHtml(g.department)}</strong></td><td>${fmt(g.codes.size)}</td><td>${fmt(g.quantity)}</td><td>${fmt(g.usage)}</td><td>${fmt(g.exception)}</td>
+    </tr>`).join("") || `<tr><td colspan="5" class="muted empty-state">Không có dữ liệu tổng hợp.</td></tr>`;
+  }
+  applyTablePagination("custodyReportBody", "custodyReport");
+  applyTablePagination("custodyDepartmentBody", "custodyDepartment");
+}
+
+function resetCustodyReportFilters() {
+  ["custodySearch","custodyDepartmentFilter","custodyHolderFilter","custodyStatusFilter"].forEach(id => { const el=document.getElementById(id); if(el) el.value=""; });
+  renderCustodyReport();
+}
+
+function exportCustodyReportCSV() {
+  const rows = getFilteredCustodyReportRows();
+  const csv = [["Mã tài sản/vật tư","Tên","Model","Serial/MAC","Danh mục","Tình trạng","Vị trí hiện tại","Đơn vị/phòng ban","Người giữ/phụ trách","Số lượng","Đơn vị tính"],
+    ...rows.map(r => [r.code,r.name,r.model,r.serial,r.category,r.status,r.location,r.department,r.holder,r.quantity,r.unit])];
+  downloadCSV(`bao_cao_tai_san_theo_don_vi_nguoi_giu_${new Date().toISOString().slice(0,10)}.csv`, csv);
+}
+
 function exportDevicesCSV() {
   const headers = ["Mã quản lý", "Tên tài sản/vật tư", "Hãng/Model/Quy cách", "Serial/MAC", "Danh mục", "Cách quản lý", "Số lượng hoạt động", "Đơn vị", "Vị trí chính", "Tồn kho theo kho", "Đang sử dụng theo nơi", "Hỏng/bảo hành theo vị trí", "Sửa chữa theo vị trí", "Thanh lý theo kho", "Tình trạng", "Ghi chú"];
   const rows = [headers];
@@ -1477,6 +1774,7 @@ async function loadUsers() {
         </td>
       </tr>
     `).join("");
+    applyTablePagination("userTableBody", "users");
   } catch (e) {
     console.error("Lỗi nạp users:", e);
   }
@@ -1540,3 +1838,7 @@ async function deleteUser(username) {
     alert("Lỗi: " + (data.error || "Không thể xóa"));
   }
 }
+document.addEventListener("click", function (event) {
+  const button = event.target.closest("[data-dashboard-alert]");
+  if (button) openDashboardAlert(button.dataset.dashboardAlert);
+});
