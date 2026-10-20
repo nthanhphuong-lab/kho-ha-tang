@@ -113,11 +113,20 @@
           </div>
         </div>
 
+        <section class="dashboard-alerts" aria-labelledby="dashboardAlertsTitle">
+          <div class="dashboard-section-heading">
+            <div><h3 id="dashboardAlertsTitle">Cảnh báo cần chú ý</h3><p class="muted">Tự động tổng hợp từ tồn kho và tình trạng thiết bị.</p></div>
+          </div>
+          <div id="dashboardAlertsGrid" class="dashboard-alert-grid">
+            <div class="dashboard-alert-card"><span class="muted">Đang kiểm tra dữ liệu…</span></div>
+          </div>
+        </section>
+
         <div class="card dashboard-quick-card">
           <div class="dashboard-section-heading">
-            <div><h3>Thao tác nhanh</h3><p class="muted">Các công việc thường dùng, không cần tìm trong menu.</p></div>
+            <div><h3>Thao tác nhanh</h3><p class="muted">Lối tắt đến các công việc thường dùng.</p></div>
           </div>
-          <div class="quick-actions">
+          <div class="quick-actions quick-actions-compact">
             <button class="primary admin-only" onclick="openDeviceModal()">＋ Thêm tài sản / vật tư</button>
             <button class="secondary admin-only" onclick="openMovementModal()">↔ Tạo phiếu đơn lẻ</button>
             <button class="secondary admin-only" onclick="openBulkMovementModal()">☑ Phiếu nhiều thiết bị</button>
@@ -128,7 +137,7 @@
 
         <div class="card dashboard-recent-card">
           <div class="dashboard-section-heading">
-            <div><h3>Giao dịch gần đây</h3><p class="muted">Các phiếu mới nhất, bao gồm cả phiếu đã hủy để tiện đối chiếu.</p></div>
+            <div><h3>Giao dịch gần đây</h3><p class="muted">3 giao dịch mới nhất. Mở lịch sử để xem đầy đủ.</p></div>
             <button class="secondary" onclick="showView('movements')">Xem toàn bộ lịch sử →</button>
           </div>
           <div class="table-card">
@@ -179,6 +188,8 @@
               <option value="repair">Đang sửa chữa</option>
               <option value="disposed">Đã thanh lý</option>
               <option value="empty">Hết tồn hoạt động</option>
+              <option value="lowStock">Vật tư sắp hết (1–2)</option>
+              <option value="noGoodStock">Vật tư hết tồn tốt</option>
             </select>
             <button class="secondary" onclick="resetFilters()">Đặt lại</button>
           </div>
@@ -360,6 +371,57 @@
 
       <!-- TAB 6: BÁO CÁO & XUẤT NHẬP EXCEL -->
       <section id="reports" class="view hidden">
+        <div class="toolbar report-toolbar">
+          <div>
+            <h2>Báo cáo tài sản theo đơn vị & người đang giữ</h2>
+            <p class="muted">Tổng hợp vị trí hiện tại, đơn vị quản lý và người nhận/phụ trách từ danh mục nơi sử dụng và lịch sử giao dịch.</p>
+          </div>
+          <button class="primary" type="button" onclick="exportCustodyReportCSV()">↓ Xuất báo cáo đang lọc (.CSV)</button>
+        </div>
+        <div class="report-kpi-grid">
+          <div class="card report-kpi"><span class="muted">Số dòng báo cáo</span><strong id="custodyKpiRows">0</strong></div>
+          <div class="card report-kpi"><span class="muted">Đang sử dụng</span><strong id="custodyKpiUsage">0</strong></div>
+          <div class="card report-kpi"><span class="muted">Chưa xác định người giữ</span><strong id="custodyKpiNoHolder">0</strong></div>
+          <div class="card report-kpi"><span class="muted">Đơn vị/phòng ban</span><strong id="custodyKpiDepartments">0</strong></div>
+        </div>
+        <div class="card report-filter-card">
+          <div class="report-filter-grid">
+            <input id="custodySearch" type="search" placeholder="Tìm mã, tên, serial, vị trí..." oninput="renderCustodyReport()">
+            <select id="custodyDepartmentFilter" aria-label="Lọc theo đơn vị/phòng ban" onchange="renderCustodyReport()"><option value="">Tất cả đơn vị/phòng ban</option></select>
+            <select id="custodyHolderFilter" aria-label="Lọc theo người giữ/phụ trách" onchange="renderCustodyReport()"><option value="">Tất cả người giữ/phụ trách</option></select>
+            <select id="custodyStatusFilter" aria-label="Lọc theo tình trạng" onchange="renderCustodyReport()">
+              <option value="">Tất cả tình trạng</option>
+              <option value="Đang sử dụng">Đang sử dụng</option>
+              <option value="Trong kho">Trong kho</option>
+              <option value="Hỏng / Bảo hành">Hỏng / Bảo hành</option>
+              <option value="Đang sửa chữa">Đang sửa chữa</option>
+              <option value="Thanh lý">Thanh lý</option>
+            </select>
+            <button type="button" class="secondary" onclick="resetCustodyReportFilters()">Đặt lại</button>
+          </div>
+          <p id="custodyReportCount" class="muted report-result-count">Đang tải báo cáo…</p>
+        </div>
+        <div class="card report-breakdown-card">
+          <div class="dashboard-section-heading">
+            <div><h3>Tổng hợp theo đơn vị/phòng ban</h3><p class="muted">Số lượng tài sản/vật tư hiện được ghi nhận tại mỗi đơn vị.</p></div>
+          </div>
+          <div class="table-card">
+            <table class="table">
+              <thead><tr><th>Đơn vị/phòng ban</th><th>Số mã</th><th>Tổng số lượng</th><th>Đang sử dụng</th><th>Hỏng / sửa / thanh lý</th></tr></thead>
+              <tbody id="custodyDepartmentBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card table-card report-detail-card">
+          <div class="report-table-heading"><h3>Danh sách chi tiết</h3><span class="muted">Có thể xuất CSV để kiểm kê hoặc đối chiếu.</span></div>
+          <div class="table-scroll">
+            <table class="table">
+              <thead><tr><th>Mã</th><th>Tài sản / vật tư</th><th>Danh mục</th><th>Tình trạng</th><th>Vị trí hiện tại</th><th>Đơn vị/phòng ban</th><th>Người giữ/phụ trách</th><th>Số lượng</th><th>Đơn vị tính</th></tr></thead>
+              <tbody id="custodyReportBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="muted report-data-note">Lưu ý: Người đang giữ được xác định từ giao dịch cấp phát/chuyển nơi sử dụng gần nhất còn hiệu lực; nếu dữ liệu cũ chưa ghi người nhận, báo cáo hiển thị “Chưa xác định”. Người phụ trách lấy từ khai báo Nơi sử dụng. Vật tư quản lý theo số lượng được tách dòng theo vị trí và trạng thái.</p>
         <div class="card" style="padding: 2rem;">
           <h2>Xuất & Nhập dữ liệu hàng loạt</h2>
           <p class="muted" style="margin-top: 5px;">Tải dữ liệu ra file Excel hoặc nạp hàng loạt hàng trăm thiết bị cùng lúc</p>
