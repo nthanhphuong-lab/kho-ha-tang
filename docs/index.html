@@ -80,9 +80,18 @@
 
     <main>
       <header>
-        <div>
+        <div class="page-heading-wrap">
           <p class="eyebrow">HỆ THỐNG QUẢN LÝ TÀI SẢN & VẬT TƯ</p>
-          <h1 id="pageTitle">Tổng quan</h1>
+          <div class="page-heading-line">
+            <div class="page-history-controls" aria-label="Điều hướng trang">
+              <button type="button" id="viewBackBtn" class="secondary icon-nav-btn" title="Quay lại menu trước" aria-label="Quay lại menu trước" onclick="navigateViewHistory(-1)" disabled>←</button>
+              <button type="button" id="viewForwardBtn" class="secondary icon-nav-btn" title="Đi tới menu kế tiếp" aria-label="Đi tới menu kế tiếp" onclick="navigateViewHistory(1)" disabled>→</button>
+            </div>
+            <div class="page-title-group">
+              <h1 id="pageTitle">Tổng quan</h1>
+              <div class="page-breadcrumb" aria-live="polite"><span>Vị trí hiện tại:</span> <strong id="currentViewLabel">Tổng quan</strong></div>
+            </div>
+          </div>
         </div>
         <div style="display:flex; gap:10px; align-items:center;">
           <button class="secondary" onclick="openScannerModal()" style="display:flex; align-items:center; gap:6px;">
