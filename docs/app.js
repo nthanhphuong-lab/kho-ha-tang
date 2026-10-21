@@ -53,6 +53,7 @@ document.addEventListener("click", (e) => {
   const val = btn.getAttribute("data-val") || "";
 
   if (act === "loan-return") { returnLoan(val);
+  } else if (act === "loan-delete") { deleteLoan(val);
   } else if (act === "loan-close-form") { document.getElementById("loanFormPanel")?.classList.add("hidden");
   } else if (act === "loan-create-submit") { createLoan();
   } else if (act === "entity-inventory") {
@@ -1684,7 +1685,7 @@ function renderLoans() {
   const sf=document.getElementById("loanStatusFilter")?.value||"";
   const rows=all.filter(l=>{const isActive=loanActiveQty(l)>0;if(sf==="active"&&!isActive)return false;if(sf==="returned"&&isActive)return false;return !q||[l.id,l.deviceCode,l.deviceName,l.borrower,l.department,l.purpose].some(x=>String(x||"").toLowerCase().includes(q));});
   if(!rows.length){body.innerHTML='<tr><td colspan="8" class="muted">Chưa có phiếu cho mượn phù hợp.</td></tr>';return;}
-  body.innerHTML=rows.slice().reverse().map(l=>{const remaining=loanActiveQty(l);const status=remaining<=0?'Đã trả đủ':(l.dueDate&&l.dueDate<today?'Quá hạn':(!l.dueDate?'Đang mượn · Không hạn':'Đang mượn'));return `<tr><td><b>${escapeHtml(l.id||'')}</b></td><td>${escapeHtml(l.deviceCode||'')}<br>${escapeHtml(l.deviceName||'')}<br><small>${escapeHtml(l.unit||'cái')}</small></td><td>${escapeHtml(l.borrower||'')}<br><small>${escapeHtml(l.department||'')}</small></td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${escapeHtml(loanDate(l.dueDate))}</td><td>${Number(l.returnedQuantity||0).toLocaleString('vi-VN')} / ${Number(l.quantity||0).toLocaleString('vi-VN')}<br><small>Còn ${remaining.toLocaleString('vi-VN')}</small></td><td><span class="status-pill">${escapeHtml(status)}</span></td><td>${remaining>0&&STATE.currentUser?.role!=='viewer'?`<button class="primary" data-act="loan-return" data-val="${escapeAttr(l.id)}">Nhận trả</button>`:''}</td></tr>`}).join('');
+  body.innerHTML=rows.slice().reverse().map(l=>{const remaining=loanActiveQty(l);const status=remaining<=0?'Đã trả đủ':(l.dueDate&&l.dueDate<today?'Quá hạn':(!l.dueDate?'Đang mượn · Không hạn':'Đang mượn'));return `<tr><td><b>${escapeHtml(l.id||'')}</b></td><td>${escapeHtml(l.deviceCode||'')}<br>${escapeHtml(l.deviceName||'')}<br><small>${escapeHtml(l.unit||'cái')}</small></td><td>${escapeHtml(l.borrower||'')}<br><small>${escapeHtml(l.department||'')}</small></td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${escapeHtml(loanDate(l.dueDate))}</td><td>${Number(l.returnedQuantity||0).toLocaleString('vi-VN')} / ${Number(l.quantity||0).toLocaleString('vi-VN')}<br><small>Còn ${remaining.toLocaleString('vi-VN')}</small></td><td><span class="status-pill">${escapeHtml(status)}</span></td><td>${remaining>0&&STATE.currentUser?.role!=='viewer'?`<button class="primary" data-act="loan-return" data-val="${escapeAttr(l.id)}">Nhận trả</button>`:''}${Number(l.returnedQuantity||0)===0&&!(l.returns||[]).length&&STATE.currentUser?.role==='admin'?` <button class="loan-delete-btn" data-act="loan-delete" data-val="${escapeAttr(l.id)}">Xóa phiếu</button>`:''}</td></tr>`}).join('');
 }
 function openLoanForm(){
  const panel=document.getElementById('loanFormPanel');if(!panel)return;
@@ -1720,6 +1721,13 @@ async function returnLoan(id){
  const qtyText=prompt(`Phiếu ${id}\nThiết bị: ${loan.deviceCode} — ${loan.deviceName}\nSố còn phải trả: ${remaining} ${loan.unit||'cái'}\nNhập số lượng nhận trả lần này:` ,String(remaining));if(qtyText===null)return;const quantity=Number(qtyText);if(!Number.isFinite(quantity)||quantity<=0||quantity>remaining)return alert('Số lượng trả phải lớn hơn 0 và không vượt số còn phải trả.');
  const condition=prompt('Tình trạng khi nhận lại (Tốt / Hỏng / Thiếu phụ kiện):','Tốt');if(condition===null)return;const note=prompt('Ghi chú khi nhận trả (không bắt buộc):','')||'';
  try{await callMutate('loan.return',{loanId:id,quantity,returnDate:new Date().toISOString().slice(0,10),condition,note,receivedBy:STATE.currentUser?.displayName||STATE.currentUser?.username||''});await loadState();}catch(e){}
+}
+async function deleteLoan(id){
+ const loan=(STATE.loans||[]).find(l=>l.id===id);if(!loan)return alert('Không tìm thấy phiếu mượn.');
+ if(STATE.currentUser?.role!=='admin')return alert('Chỉ quản trị viên mới được xóa phiếu mượn.');
+ if(Number(loan.returnedQuantity||0)>0||(loan.returns||[]).length)return alert('Phiếu đã có giao dịch trả. Không thể xóa trực tiếp để tránh mất lịch sử; hãy liên hệ quản trị để điều chỉnh.');
+ const ok=confirm(`XÓA PHIẾU MƯỢN ${id}?\nThiết bị: ${loan.deviceCode} — ${loan.deviceName}\nSố lượng: ${loan.quantity}\n\nSố lượng sẽ được hoàn lại đúng nguồn ban đầu và giao dịch mượn liên quan sẽ bị xóa. Thao tác này không thể hoàn tác.`);if(!ok)return;
+ try{await callMutate('loan.delete',{loanId:id});await loadState();showView('loans');alert('Đã xóa phiếu mượn và hoàn lại số lượng về nguồn ban đầu.');}catch(e){}
 }
 function exportLoansCSV(){const rows=[['Mã phiếu','Mã thiết bị','Tên thiết bị','Người mượn','Đơn vị','Ngày mượn','Hạn trả','Số lượng mượn','Đã trả','Còn lại','Mục đích','Nơi sử dụng','Người bàn giao','Ghi chú']];for(const l of STATE.loans||[])rows.push([l.id,l.deviceCode,l.deviceName,l.borrower,l.department,l.loanDate,l.dueDate||'Không xác định',l.quantity,l.returnedQuantity||0,loanActiveQty(l),l.purpose,l.place,l.handoverBy,l.note]);downloadCSV('bao-cao-cho-muon-tra.csv',rows);}
 
