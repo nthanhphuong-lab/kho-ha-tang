@@ -106,6 +106,11 @@
 
       <!-- TAB 1: TỔNG QUAN -->
       <section id="dashboard" class="view">
+        <div class="overview-tabs" role="tablist" aria-label="Tổng quan">
+          <button type="button" id="overviewInventoryTab" class="overview-tab active" role="tab" aria-selected="true" onclick="showOverviewTab('inventory')">📊 Tổng quan kho tài sản – vật tư</button>
+          <button type="button" id="overviewLoansTab" class="overview-tab" role="tab" aria-selected="false" onclick="showOverviewTab('loans')">🤝 Quản lý mượn – trả thiết bị</button>
+        </div>
+        <div id="overviewInventoryPanel" class="overview-tab-panel">
         <div class="stats-grid">
           <div class="card stat-card">
             <span class="muted">Tổng số lượng tồn</span>
@@ -179,6 +184,20 @@
           <div id="dashboardUsageLocations" class="stats-grid" style="margin-top:14px;"></div>
         </div>
         <div id="dashboardUsageDetail" class="card hidden" style="margin-top:12px; padding:16px;"></div>
+        </div>
+              <div id="overviewLoansPanel" class="overview-tab-panel hidden">
+        <div class="dashboard-section-heading"><div><h2>Quản lý cho mượn – trả thiết bị</h2><p class="muted">Theo dõi thiết bị mượn theo mã riêng hoặc vật tư mượn theo số lượng. Hạn trả không bắt buộc.</p></div><button class="primary admin-only" onclick="openLoanForm()">＋ Lập phiếu cho mượn</button></div>
+        <div class="stats-grid" style="margin-bottom:14px">
+          <div class="card stat-card"><span class="muted">Phiếu đang mượn</span><h2 id="loanStatActive">0</h2></div>
+          <div class="card stat-card"><span class="muted">Đang giữ (đơn vị)</span><h2 id="loanStatQty">0</h2></div>
+          <div class="card stat-card"><span class="muted">Không có hạn trả</span><h2 id="loanStatNoDue">0</h2></div>
+          <div class="card stat-card"><span class="muted">Quá hạn</span><h2 id="loanStatOverdue">0</h2></div>
+        </div>
+        <div class="toolbar-stacked"><div class="filter-bar"><input id="loanSearch" placeholder="Tìm mã phiếu, thiết bị, người mượn..." oninput="renderLoans()"><select id="loanStatusFilter" onchange="renderLoans()"><option value="">-- Tất cả trạng thái --</option><option value="active">Đang mượn</option><option value="returned">Đã trả đủ</option></select><button class="secondary" onclick="document.getElementById('loanSearch').value='';document.getElementById('loanStatusFilter').value='';renderLoans()">Đặt lại</button><button class="secondary" onclick="exportLoansCSV()">↓ Xuất CSV</button></div></div>
+        <div class="card table-card" style="margin-top:12px"><table class="table"><thead><tr><th>Mã phiếu</th><th>Thiết bị / vật tư</th><th>Người mượn</th><th>Ngày mượn</th><th>Hạn trả</th><th>Đã trả / Tổng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="loanTableBody"></tbody></table></div>
+        <div id="loanFormPanel" class="card hidden" style="margin-top:14px;padding:18px"></div>
+      </div>
+
       </section>
 
       <!-- TAB 2: DANH SÁCH THIẾT BỊ -->
@@ -348,7 +367,7 @@
         </div>
       </section>
 
-      <!-- TAB THEO DÕI HỎNG / SỬA CHỮA / THANH LÝ -->
+
       <section id="disposition" class="view hidden">
         <div class="toolbar">
           <div>
