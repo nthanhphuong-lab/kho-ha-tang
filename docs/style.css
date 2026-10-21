@@ -460,3 +460,28 @@ input,select { min-height:38px; }
 .overview-tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--card, #fff)}
 .overview-tab-panel{min-width:0}
 @media(max-width:640px){.overview-tabs{margin-bottom:14px;padding-top:4px}.overview-tab{padding:9px 12px;font-size:12px;max-width:220px}main{padding:1rem}}
+
+/* V5.2.17: ultra-compact tabs; do not stretch across the dashboard */
+#dashboard > .overview-tabs{
+  display:flex !important; align-items:flex-end; justify-content:flex-start !important;
+  gap:4px; width:max-content; max-width:100%; min-height:0; height:39px;
+  margin:0 0 12px !important; padding:0 0 0 2px !important;
+  background:transparent !important; border:0 !important; border-bottom:1px solid var(--border) !important;
+  border-radius:0 !important; overflow-x:auto; overflow-y:hidden;
+}
+#dashboard > .overview-tabs .overview-tab{
+  flex:0 0 auto !important; width:auto !important; min-width:0 !important; max-width:260px;
+  height:35px; padding:7px 12px !important; margin:0 !important;
+  border:1px solid transparent !important; border-bottom:0 !important;
+  border-radius:7px 7px 0 0 !important; background:transparent !important;
+  font-size:12px; line-height:18px; white-space:nowrap;
+}
+#dashboard > .overview-tabs .overview-tab.active{
+  background:var(--card, #fff) !important; border-color:var(--border) !important;
+  color:var(--primary) !important; box-shadow:none !important;
+}
+#dashboard > .overview-tabs .overview-tab.active::after{height:2px;bottom:-1px;left:0;right:0;background:var(--card, #fff)}
+@media(max-width:640px){
+  #dashboard > .overview-tabs{height:37px;margin-bottom:10px !important}
+  #dashboard > .overview-tabs .overview-tab{height:33px;padding:6px 9px !important;font-size:11px}
+}
