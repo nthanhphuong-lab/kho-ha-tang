@@ -485,3 +485,6 @@ input,select { min-height:38px; }
   #dashboard > .overview-tabs{height:37px;margin-bottom:10px !important}
   #dashboard > .overview-tabs .overview-tab{height:33px;padding:6px 9px !important;font-size:11px}
 }
+
+/* V5.2.19: nút xóa phiếu mượn nhập sai */
+.loan-delete-btn{background:#fff1f2;color:#b91c1c;border:1px solid #fecdd3;border-radius:8px;padding:7px 10px;cursor:pointer;font:inherit;font-size:.875rem}.loan-delete-btn:hover{background:#ffe4e6}
