@@ -585,3 +585,16 @@ input,select { min-height:38px; }
 .link-button { border:0; padding:0; margin:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
 .link-button:hover { color:#1d4ed8; text-decoration:underline; }
 .record-code-link { max-width:100%; overflow-wrap:anywhere; }
+
+/* V5.2.28: keep action icons fully visible and remove redundant loan view icon */
+.loan-action-icons { gap: 4px; }
+.movement-actions-cell { min-width: 118px; width: 118px; white-space: nowrap; }
+.movement-action-icons { gap: 4px; justify-content: flex-start; }
+.movement-action-icons .icon-action,
+.loan-action-icons .icon-action { flex: 0 0 28px; width: 28px; min-width: 28px; height: 28px; font-size: 16px; }
+#loanTableBody, #movementTableBody { scroll-margin-bottom: 12px; }
+#loanTableBody { white-space: normal; }
+#loanTableBody td:last-child, #movementTableBody td:last-child { white-space: nowrap; }
+#loanTableBody td:last-child { min-width: 96px; }
+#movementTableBody { overflow: visible; }
+#movementTableBody td.movement-actions-cell { padding-right: 10px; }
