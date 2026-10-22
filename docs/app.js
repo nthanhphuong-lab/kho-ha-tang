@@ -1730,6 +1730,17 @@ function exportLoansCSV(){const rows=[['Mã phiếu','Mã thiết bị','Tên th
 
 // DASHBOARD THỐNG KÊ DANH MỤC + XUẤT BÁO CÁO
 function qtyMapSum(map){return Object.values(map||{}).reduce((s,v)=>s+Math.max(0,Number(v)||0),0)}
+function categoryUsageAllocationText(d){
+ const unit=d.unit||'cái';
+ if(d.trackingMode==='quantity'){
+  const map=d.usageByLocation||{};
+  const parts=Object.entries(map).filter(([,q])=>Number(q)>0).map(([loc,q])=>`${loc}: ${Number(q).toLocaleString('vi-VN')} ${unit}`);
+  const damaged=Object.entries(d.usageDamagedByLocation||{}).filter(([,q])=>Number(q)>0).map(([loc,q])=>`${loc} (hỏng): ${Number(q).toLocaleString('vi-VN')} ${unit}`);
+  const repair=Object.entries(d.usageRepairByLocation||{}).filter(([,q])=>Number(q)>0).map(([loc,q])=>`${loc} (sửa chữa): ${Number(q).toLocaleString('vi-VN')} ${unit}`);
+  return [...parts,...damaged,...repair].join('; ')||'—';
+ }
+ return d.status==='Đang sử dụng' ? `${d.usageLocation||d.location||'Chưa xác định'}: 1 ${unit}` : '—';
+}
 function categoryDashboardRows(){
  const sel=document.getElementById('categoryDashboardSelect'); const category=sel?.value || 'Laptop';
  return (STATE.devices||[]).filter(d=>String(d.category||'').trim().toLowerCase()===String(category).trim().toLowerCase()).map(d=>{
@@ -1740,7 +1751,7 @@ function categoryDashboardRows(){
   let damaged=individual?(/hỏng|bảo hành/i.test(d.status||'')?1:0):qtyMapSum(d.damagedByLocation)+qtyMapSum(d.usageDamagedByLocation);
   let repair=individual?(/đang sửa chữa/i.test(d.status||'')?1:0):qtyMapSum(d.repairByLocation)+qtyMapSum(d.usageRepairByLocation);
   let total=individual?1:(stock+used+loaned+damaged+repair);
-  return {device:d,stock,used,loaned,damaged,repair,total,status:displayDeviceStatus(d)};
+  return {device:d,stock,used,usageDetails:categoryUsageAllocationText(d),loaned,damaged,repair,total,status:displayDeviceStatus(d)};
  });
 }
 function populateCategoryDashboardSelect(){const el=document.getElementById('categoryDashboardSelect');if(!el)return;const cats=[...new Set([...(STATE.categories||[]),...(STATE.devices||[]).map(d=>d.category).filter(Boolean)])].sort((a,b)=>String(a).localeCompare(String(b),'vi'));const previous=el.value;el.innerHTML=cats.map(c=>`<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');const preferred=cats.find(c=>String(c).trim().toLowerCase()==='laptop');el.value=(previous&&cats.includes(previous))?previous:(preferred||cats[0]||'');}
@@ -1750,13 +1761,13 @@ function renderCategoryDashboard(){
  const rows=categoryDashboardRows(),sum=k=>rows.reduce((s,r)=>s+r[k],0),vals=[['Tổng ghi nhận',sum('total')],['Còn trong kho',sum('stock')],['Đã cấp sử dụng',sum('used')],['Đang cho mượn',sum('loaned')],['Hỏng',sum('damaged')],['Đang sửa chữa',sum('repair')]];
  const stats=document.getElementById('categoryDashboardStats');if(stats)stats.innerHTML=vals.map(([label,value])=>`<div class="card stat-card"><span class="muted">${label}</span><h2>${Number(value).toLocaleString('vi-VN')}</h2></div>`).join('');
  const bars=document.getElementById('categoryDashboardBars');if(bars){const max=Math.max(1,...vals.slice(1).map(x=>x[1]));bars.innerHTML=vals.slice(1).map(([label,value])=>`<div class="dashboard-alert-card"><div style="display:flex;justify-content:space-between;gap:8px"><b>${label}</b><b>${Number(value).toLocaleString('vi-VN')}</b></div><div style="height:8px;background:#e2e8f0;border-radius:99px;margin-top:8px;overflow:hidden"><div style="height:100%;width:${Math.min(100,value/max*100)}%;background:#2563eb"></div></div></div>`).join('');}
- const body=document.getElementById('categoryDashboardRows');if(body)body.innerHTML=rows.map(r=>`<tr><td><b>${escapeHtml(r.device.code||'—')}</b></td><td>${escapeHtml(r.device.name||'')}</td><td>${r.stock}</td><td>${r.used}</td><td>${r.loaned}</td><td>${r.damaged}</td><td>${r.repair}</td><td><b>${r.total}</b></td><td>${escapeHtml(r.status)}</td></tr>`).join('')||'<tr><td colspan="9" class="muted">Danh mục này chưa có thiết bị.</td></tr>';
+ const body=document.getElementById('categoryDashboardRows');if(body)body.innerHTML=rows.map(r=>`<tr><td><b>${escapeHtml(r.device.code||'—')}</b></td><td>${escapeHtml(r.device.name||'')}</td><td>${r.stock}</td><td>${r.used}</td><td>${escapeHtml(r.usageDetails)}</td><td>${r.loaned}</td><td>${r.damaged}</td><td>${r.repair}</td><td><b>${r.total}</b></td><td>${escapeHtml(r.status)}</td></tr>`).join('')||'<tr><td colspan="10" class="muted">Danh mục này chưa có thiết bị.</td></tr>';
  const loans=(STATE.loans||[]).filter(l=>rows.some(r=>String(r.device.code)===String(l.deviceCode)));const lb=document.getElementById('categoryDashboardLoans');if(lb)lb.innerHTML=loans.slice().reverse().map(l=>{const rem=Math.max(0,Number(l.quantity||0)-Number(l.returnedQuantity||0));return `<tr><td>${escapeHtml(l.id)}</td><td>${escapeHtml(l.deviceCode)} — ${escapeHtml(l.deviceName)}</td><td>${escapeHtml((l.sourceType==='usage'?'Nơi sử dụng: ':'Kho: ')+(l.sourceLocation||''))}</td><td>${escapeHtml(l.borrower||'')}</td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${Number(l.quantity||0)}</td><td>${Number(l.returnedQuantity||0)}</td><td>${rem}</td><td>${rem?'Đang mượn':'Đã trả đủ'}</td></tr>`}).join('')||'<tr><td colspan="9" class="muted">Chưa có phiếu mượn thuộc danh mục.</td></tr>';
 }
 function exportCategoryDashboardReport(){
  const category=document.getElementById('categoryDashboardSelect')?.value||'Laptop',rows=categoryDashboardRows();
- const out=[['BÁO CÁO THỐNG KÊ DANH MỤC THIẾT BỊ'],['Danh mục',category],['Ngày xuất',new Date().toLocaleString('vi-VN')],[],['Tổng ghi nhận',rows.reduce((s,r)=>s+r.total,0)],['Còn trong kho',rows.reduce((s,r)=>s+r.stock,0)],['Đã cấp sử dụng',rows.reduce((s,r)=>s+r.used,0)],['Đang cho mượn',rows.reduce((s,r)=>s+r.loaned,0)],['Hỏng',rows.reduce((s,r)=>s+r.damaged,0)],['Đang sửa chữa',rows.reduce((s,r)=>s+r.repair,0)],[],['Mã','Tên','Danh mục','Kho còn','Đã sử dụng','Đang mượn','Hỏng','Sửa chữa','Tổng ghi nhận','Tình trạng','Vị trí','Đơn vị']];
- rows.forEach(r=>out.push([r.device.code,r.device.name,r.device.category,r.stock,r.used,r.loaned,r.damaged,r.repair,r.total,r.status,r.device.usageLocation||r.device.location||'',r.device.unit||'cái']));
+ const out=[['BÁO CÁO THỐNG KÊ DANH MỤC THIẾT BỊ'],['Danh mục',category],['Ngày xuất',new Date().toLocaleString('vi-VN')],[],['Tổng ghi nhận',rows.reduce((s,r)=>s+r.total,0)],['Còn trong kho',rows.reduce((s,r)=>s+r.stock,0)],['Đã cấp sử dụng',rows.reduce((s,r)=>s+r.used,0)],['Đang cho mượn',rows.reduce((s,r)=>s+r.loaned,0)],['Hỏng',rows.reduce((s,r)=>s+r.damaged,0)],['Đang sửa chữa',rows.reduce((s,r)=>s+r.repair,0)],[],['Mã','Tên','Danh mục','Kho còn','Đã cấp sử dụng','Chi tiết cấp sử dụng theo phòng/nơi','Đang mượn','Hỏng','Sửa chữa','Tổng ghi nhận','Tình trạng','Vị trí','Đơn vị']];
+ rows.forEach(r=>out.push([r.device.code,r.device.name,r.device.category,r.stock,r.used,r.usageDetails,r.loaned,r.damaged,r.repair,r.total,r.status,r.device.usageLocation||r.device.location||'',r.device.unit||'cái']));
  out.push([],['PHIẾU MƯỢN – TRẢ'],['Mã phiếu','Mã thiết bị','Tên thiết bị','Nguồn','Vị trí nguồn','Người mượn','Đơn vị','Ngày mượn','Hạn trả','Số lượng','Đã trả','Còn phải trả','Mục đích','Nơi sử dụng','Người bàn giao','Ghi chú']);
  for(const l of (STATE.loans||[]).filter(l=>rows.some(r=>String(r.device.code)===String(l.deviceCode))))out.push([l.id,l.deviceCode,l.deviceName,l.sourceType==='usage'?'Nơi sử dụng':'Kho',l.sourceLocation,l.borrower,l.department,l.loanDate,l.dueDate||'Không xác định',l.quantity,l.returnedQuantity||0,Math.max(0,Number(l.quantity||0)-Number(l.returnedQuantity||0)),l.purpose,l.place,l.handoverBy,l.note]);
  downloadCSV(`bao-cao-danh-muc-${category.replace(/[^\w\-]+/g,'_')}.csv`,out);
