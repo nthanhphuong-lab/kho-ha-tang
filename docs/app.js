@@ -529,6 +529,16 @@ function renderDashboard() {
   if (inUse) inUse.innerText = STATE.devices.reduce((sum, d) => sum + deviceUsageQuantity(d), 0).toLocaleString("vi-VN");
   const faulty = document.getElementById("statFaulty");
   if (faulty) faulty.innerText = STATE.devices.reduce((sum, d) => sum + deviceDamagedQuantity(d), 0).toLocaleString("vi-VN");
+  // Số lượng đang mượn là số còn phải trả của các phiếu mượn chưa đóng.
+  const loaned = document.getElementById("statLoaned");
+  if (loaned) {
+    const activeLoanQty = (STATE.loans || []).reduce((sum, loan) => {
+      const remaining = Math.max(0, Number(loan.quantity || 0) - Number(loan.returnedQuantity || 0));
+      const closed = ["Đã trả", "Đã hoàn tất", "Đã hủy", "Đã xóa"].includes(String(loan.status || "").trim());
+      return sum + (closed ? 0 : remaining);
+    }, 0);
+    loaned.innerText = activeLoanQty.toLocaleString("vi-VN");
+  }
   renderDashboardLocations();
   renderDashboardUsageLocations();
   renderDashboardAlerts();
