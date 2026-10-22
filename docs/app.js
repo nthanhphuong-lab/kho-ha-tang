@@ -223,18 +223,13 @@ function updateViewHistoryButtons() {
 }
 
 function showOverviewTab(tab = "inventory") {
-  const inventory = document.getElementById("overviewInventoryPanel");
-  const loans = document.getElementById("overviewLoansPanel");
-  const inventoryTab = document.getElementById("overviewInventoryTab");
-  const loansTab = document.getElementById("overviewLoansTab");
-  const showLoans = tab === "loans";
-  inventory?.classList.toggle("hidden", showLoans);
-  loans?.classList.toggle("hidden", !showLoans);
-  inventoryTab?.classList.toggle("active", !showLoans);
-  loansTab?.classList.toggle("active", showLoans);
-  inventoryTab?.setAttribute("aria-selected", String(!showLoans));
-  loansTab?.setAttribute("aria-selected", String(showLoans));
-  if (showLoans) renderLoans();
+  const tabs = { inventory: ["overviewInventoryPanel","overviewInventoryTab"], loans: ["overviewLoansPanel","overviewLoansTab"], categoryStats: ["overviewCategoryStatsPanel","overviewCategoryTab"] };
+  Object.entries(tabs).forEach(([key, ids]) => {
+    const panel=document.getElementById(ids[0]), button=document.getElementById(ids[1]);
+    panel?.classList.toggle("hidden", key!==tab); button?.classList.toggle("active",key===tab); button?.setAttribute("aria-selected",String(key===tab));
+  });
+  if (tab === "loans") renderLoans();
+  if (tab === "categoryStats") renderCategoryDashboard();
 }
 
 function showView(viewId, options = {}) {
@@ -376,6 +371,8 @@ async function loadState() {
     renderDevices();
     renderMovements();
     renderLoans();
+    populateCategoryDashboardSelect();
+    renderCategoryDashboard();
     renderDisposition();
     renderCategories();
     renderLocations();
@@ -1685,7 +1682,7 @@ function renderLoans() {
   const sf=document.getElementById("loanStatusFilter")?.value||"";
   const rows=all.filter(l=>{const isActive=loanActiveQty(l)>0;if(sf==="active"&&!isActive)return false;if(sf==="returned"&&isActive)return false;return !q||[l.id,l.deviceCode,l.deviceName,l.borrower,l.department,l.purpose].some(x=>String(x||"").toLowerCase().includes(q));});
   if(!rows.length){body.innerHTML='<tr><td colspan="8" class="muted">Chưa có phiếu cho mượn phù hợp.</td></tr>';return;}
-  body.innerHTML=rows.slice().reverse().map(l=>{const remaining=loanActiveQty(l);const status=remaining<=0?'Đã trả đủ':(l.dueDate&&l.dueDate<today?'Quá hạn':(!l.dueDate?'Đang mượn · Không hạn':'Đang mượn'));return `<tr><td><b>${escapeHtml(l.id||'')}</b></td><td>${escapeHtml(l.deviceCode||'')}<br>${escapeHtml(l.deviceName||'')}<br><small>${escapeHtml(l.unit||'cái')}</small></td><td>${escapeHtml(l.borrower||'')}<br><small>${escapeHtml(l.department||'')}</small></td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${escapeHtml(loanDate(l.dueDate))}</td><td>${Number(l.returnedQuantity||0).toLocaleString('vi-VN')} / ${Number(l.quantity||0).toLocaleString('vi-VN')}<br><small>Còn ${remaining.toLocaleString('vi-VN')}</small></td><td><span class="status-pill">${escapeHtml(status)}</span></td><td>${remaining>0&&STATE.currentUser?.role!=='viewer'?`<button class="primary" data-act="loan-return" data-val="${escapeAttr(l.id)}">Nhận trả</button>`:''}${Number(l.returnedQuantity||0)===0&&!(l.returns||[]).length&&STATE.currentUser?.role==='admin'?` <button class="loan-delete-btn" data-act="loan-delete" data-val="${escapeAttr(l.id)}">Xóa phiếu</button>`:''}</td></tr>`}).join('');
+  body.innerHTML=rows.slice().reverse().map(l=>{const remaining=loanActiveQty(l);const status=remaining<=0?'Đã trả đủ':(l.dueDate&&l.dueDate<today?'Quá hạn':(!l.dueDate?'Đang mượn · Không hạn':'Đang mượn'));return `<tr><td><b>${escapeHtml(l.id||'')}</b></td><td>${escapeHtml(l.deviceCode||'')}<br>${escapeHtml(l.deviceName||'')}<br><small>${escapeHtml(l.unit||'cái')}</small></td><td>${escapeHtml(l.borrower||'')}<br><small>${escapeHtml(l.department||'')}</small></td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${escapeHtml(loanDate(l.dueDate))}</td><td>${Number(l.returnedQuantity||0).toLocaleString('vi-VN')} / ${Number(l.quantity||0).toLocaleString('vi-VN')}<br><small>Còn ${remaining.toLocaleString('vi-VN')}</small></td><td><span class="status-pill">${escapeHtml(status)}</span></td><td>${remaining>0&&STATE.currentUser?.role!=='viewer'?`<button class="primary" data-act="loan-return" data-val="${escapeAttr(l.id)}">Nhận trả</button>`:''}${STATE.currentUser?.role==='admin'?` <button class="loan-delete-btn" data-act="loan-delete" data-val="${escapeAttr(l.id)}">Xóa phiếu</button>`:''}</td></tr>`}).join('');
 }
 function openLoanForm(){
  const panel=document.getElementById('loanFormPanel');if(!panel)return;
@@ -1725,11 +1722,45 @@ async function returnLoan(id){
 async function deleteLoan(id){
  const loan=(STATE.loans||[]).find(l=>l.id===id);if(!loan)return alert('Không tìm thấy phiếu mượn.');
  if(STATE.currentUser?.role!=='admin')return alert('Chỉ quản trị viên mới được xóa phiếu mượn.');
- if(Number(loan.returnedQuantity||0)>0||(loan.returns||[]).length)return alert('Phiếu đã có giao dịch trả. Không thể xóa trực tiếp để tránh mất lịch sử; hãy liên hệ quản trị để điều chỉnh.');
- const ok=confirm(`XÓA PHIẾU MƯỢN ${id}?\nThiết bị: ${loan.deviceCode} — ${loan.deviceName}\nSố lượng: ${loan.quantity}\n\nSố lượng sẽ được hoàn lại đúng nguồn ban đầu và giao dịch mượn liên quan sẽ bị xóa. Thao tác này không thể hoàn tác.`);if(!ok)return;
- try{await callMutate('loan.delete',{loanId:id});await loadState();showView('loans');alert('Đã xóa phiếu mượn và hoàn lại số lượng về nguồn ban đầu.');}catch(e){}
+ const returned=Number(loan.returnedQuantity||0);
+ const ok=confirm(`XÓA TOÀN BỘ PHIẾU MƯỢN ${id}?\nThiết bị: ${loan.deviceCode} — ${loan.deviceName}\nSố lượng mượn: ${loan.quantity}; đã trả: ${returned}; còn mượn: ${loanActiveQty(loan)}\n\nHệ thống sẽ hoàn tác các lần trả, phục hồi số lượng/trạng thái về nguồn ban đầu và xóa các giao dịch liên quan. Chỉ thực hiện khi phiếu được nhập nhầm. Không thể hoàn tác thao tác này.`);if(!ok)return;
+ try{await callMutate('loan.delete',{loanId:id});await loadState();showView('loans');alert('Đã xóa phiếu mượn và hoàn tác các giao dịch liên quan.');}catch(e){}
 }
 function exportLoansCSV(){const rows=[['Mã phiếu','Mã thiết bị','Tên thiết bị','Người mượn','Đơn vị','Ngày mượn','Hạn trả','Số lượng mượn','Đã trả','Còn lại','Mục đích','Nơi sử dụng','Người bàn giao','Ghi chú']];for(const l of STATE.loans||[])rows.push([l.id,l.deviceCode,l.deviceName,l.borrower,l.department,l.loanDate,l.dueDate||'Không xác định',l.quantity,l.returnedQuantity||0,loanActiveQty(l),l.purpose,l.place,l.handoverBy,l.note]);downloadCSV('bao-cao-cho-muon-tra.csv',rows);}
+
+// DASHBOARD THỐNG KÊ DANH MỤC + XUẤT BÁO CÁO
+function qtyMapSum(map){return Object.values(map||{}).reduce((s,v)=>s+Math.max(0,Number(v)||0),0)}
+function categoryDashboardRows(){
+ const sel=document.getElementById('categoryDashboardSelect'); const category=sel?.value || 'Laptop';
+ return (STATE.devices||[]).filter(d=>String(d.category||'').trim().toLowerCase()===String(category).trim().toLowerCase()).map(d=>{
+  const individual=d.trackingMode!=='quantity';
+  let stock=individual?(d.status==='Trong kho'?1:0):qtyMapSum(d.stockByLocation);
+  let used=individual?(d.status==='Đang sử dụng'?1:0):qtyMapSum(d.usageByLocation);
+  let loaned=individual?(d.status==='Đang cho mượn'?1:0):qtyMapSum((()=>{const m={};for(const l of STATE.loans||[])if(String(l.deviceCode)===String(d.code))m[l.id]=Math.max(0,Number(l.quantity||0)-Number(l.returnedQuantity||0));return m})());
+  let damaged=individual?(/hỏng|bảo hành/i.test(d.status||'')?1:0):qtyMapSum(d.damagedByLocation)+qtyMapSum(d.usageDamagedByLocation);
+  let repair=individual?(/đang sửa chữa/i.test(d.status||'')?1:0):qtyMapSum(d.repairByLocation)+qtyMapSum(d.usageRepairByLocation);
+  let total=individual?1:(stock+used+loaned+damaged+repair);
+  return {device:d,stock,used,loaned,damaged,repair,total,status:displayDeviceStatus(d)};
+ });
+}
+function populateCategoryDashboardSelect(){const el=document.getElementById('categoryDashboardSelect');if(!el)return;const cats=[...new Set([...(STATE.categories||[]),...(STATE.devices||[]).map(d=>d.category).filter(Boolean)])].sort((a,b)=>String(a).localeCompare(String(b),'vi'));const previous=el.value;el.innerHTML=cats.map(c=>`<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');const preferred=cats.find(c=>String(c).trim().toLowerCase()==='laptop');el.value=(previous&&cats.includes(previous))?previous:(preferred||cats[0]||'');}
+function resetCategoryDashboard(){const el=document.getElementById('categoryDashboardSelect');if(el){const opt=[...el.options].find(o=>o.value.trim().toLowerCase()==='laptop');if(opt)el.value=opt.value;}renderCategoryDashboard();}
+function renderCategoryDashboard(){
+ const sel=document.getElementById('categoryDashboardSelect');if(!sel)return; if(!sel.options.length)populateCategoryDashboardSelect();
+ const rows=categoryDashboardRows(),sum=k=>rows.reduce((s,r)=>s+r[k],0),vals=[['Tổng ghi nhận',sum('total')],['Còn trong kho',sum('stock')],['Đã cấp sử dụng',sum('used')],['Đang cho mượn',sum('loaned')],['Hỏng',sum('damaged')],['Đang sửa chữa',sum('repair')]];
+ const stats=document.getElementById('categoryDashboardStats');if(stats)stats.innerHTML=vals.map(([label,value])=>`<div class="card stat-card"><span class="muted">${label}</span><h2>${Number(value).toLocaleString('vi-VN')}</h2></div>`).join('');
+ const bars=document.getElementById('categoryDashboardBars');if(bars){const max=Math.max(1,...vals.slice(1).map(x=>x[1]));bars.innerHTML=vals.slice(1).map(([label,value])=>`<div class="dashboard-alert-card"><div style="display:flex;justify-content:space-between;gap:8px"><b>${label}</b><b>${Number(value).toLocaleString('vi-VN')}</b></div><div style="height:8px;background:#e2e8f0;border-radius:99px;margin-top:8px;overflow:hidden"><div style="height:100%;width:${Math.min(100,value/max*100)}%;background:#2563eb"></div></div></div>`).join('');}
+ const body=document.getElementById('categoryDashboardRows');if(body)body.innerHTML=rows.map(r=>`<tr><td><b>${escapeHtml(r.device.code||'—')}</b></td><td>${escapeHtml(r.device.name||'')}</td><td>${r.stock}</td><td>${r.used}</td><td>${r.loaned}</td><td>${r.damaged}</td><td>${r.repair}</td><td><b>${r.total}</b></td><td>${escapeHtml(r.status)}</td></tr>`).join('')||'<tr><td colspan="9" class="muted">Danh mục này chưa có thiết bị.</td></tr>';
+ const loans=(STATE.loans||[]).filter(l=>rows.some(r=>String(r.device.code)===String(l.deviceCode)));const lb=document.getElementById('categoryDashboardLoans');if(lb)lb.innerHTML=loans.slice().reverse().map(l=>{const rem=Math.max(0,Number(l.quantity||0)-Number(l.returnedQuantity||0));return `<tr><td>${escapeHtml(l.id)}</td><td>${escapeHtml(l.deviceCode)} — ${escapeHtml(l.deviceName)}</td><td>${escapeHtml((l.sourceType==='usage'?'Nơi sử dụng: ':'Kho: ')+(l.sourceLocation||''))}</td><td>${escapeHtml(l.borrower||'')}</td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${Number(l.quantity||0)}</td><td>${Number(l.returnedQuantity||0)}</td><td>${rem}</td><td>${rem?'Đang mượn':'Đã trả đủ'}</td></tr>`}).join('')||'<tr><td colspan="9" class="muted">Chưa có phiếu mượn thuộc danh mục.</td></tr>';
+}
+function exportCategoryDashboardReport(){
+ const category=document.getElementById('categoryDashboardSelect')?.value||'Laptop',rows=categoryDashboardRows();
+ const out=[['BÁO CÁO THỐNG KÊ DANH MỤC THIẾT BỊ'],['Danh mục',category],['Ngày xuất',new Date().toLocaleString('vi-VN')],[],['Tổng ghi nhận',rows.reduce((s,r)=>s+r.total,0)],['Còn trong kho',rows.reduce((s,r)=>s+r.stock,0)],['Đã cấp sử dụng',rows.reduce((s,r)=>s+r.used,0)],['Đang cho mượn',rows.reduce((s,r)=>s+r.loaned,0)],['Hỏng',rows.reduce((s,r)=>s+r.damaged,0)],['Đang sửa chữa',rows.reduce((s,r)=>s+r.repair,0)],[],['Mã','Tên','Danh mục','Kho còn','Đã sử dụng','Đang mượn','Hỏng','Sửa chữa','Tổng ghi nhận','Tình trạng','Vị trí','Đơn vị']];
+ rows.forEach(r=>out.push([r.device.code,r.device.name,r.device.category,r.stock,r.used,r.loaned,r.damaged,r.repair,r.total,r.status,r.device.usageLocation||r.device.location||'',r.device.unit||'cái']));
+ out.push([],['PHIẾU MƯỢN – TRẢ'],['Mã phiếu','Mã thiết bị','Tên thiết bị','Nguồn','Vị trí nguồn','Người mượn','Đơn vị','Ngày mượn','Hạn trả','Số lượng','Đã trả','Còn phải trả','Mục đích','Nơi sử dụng','Người bàn giao','Ghi chú']);
+ for(const l of (STATE.loans||[]).filter(l=>rows.some(r=>String(r.device.code)===String(l.deviceCode))))out.push([l.id,l.deviceCode,l.deviceName,l.sourceType==='usage'?'Nơi sử dụng':'Kho',l.sourceLocation,l.borrower,l.department,l.loanDate,l.dueDate||'Không xác định',l.quantity,l.returnedQuantity||0,Math.max(0,Number(l.quantity||0)-Number(l.returnedQuantity||0)),l.purpose,l.place,l.handoverBy,l.note]);
+ downloadCSV(`bao-cao-danh-muc-${category.replace(/[^\w\-]+/g,'_')}.csv`,out);
+}
 
 // BÁO CÁO CSV
 function downloadCSV(filename, rows) {
