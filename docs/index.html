@@ -109,6 +109,7 @@
         <div class="overview-tabs" role="tablist" aria-label="Tổng quan">
           <button type="button" id="overviewInventoryTab" class="overview-tab active" role="tab" aria-selected="true" onclick="showOverviewTab('inventory')">📊 Kho tài sản – vật tư</button>
           <button type="button" id="overviewLoansTab" class="overview-tab" role="tab" aria-selected="false" onclick="showOverviewTab('loans')">🤝 Mượn – trả thiết bị</button>
+          <button type="button" id="overviewCategoryTab" class="overview-tab" role="tab" aria-selected="false" onclick="showOverviewTab('categoryStats')">📈 Thống kê danh mục</button>
         </div>
         <div id="overviewInventoryPanel" class="overview-tab-panel">
         <div class="stats-grid">
@@ -184,6 +185,14 @@
           <div id="dashboardUsageLocations" class="stats-grid" style="margin-top:14px;"></div>
         </div>
         <div id="dashboardUsageDetail" class="card hidden" style="margin-top:12px; padding:16px;"></div>
+        </div>
+        <div id="overviewCategoryStatsPanel" class="overview-tab-panel hidden">
+          <div class="dashboard-section-heading"><div><h2>Thống kê danh mục thiết bị</h2><p class="muted">Tách riêng tồn kho khả dụng, đã cấp sử dụng, đang cho mượn và thiết bị cần xử lý.</p></div><button class="primary" onclick="exportCategoryDashboardReport()">↓ Xuất báo cáo CSV</button></div>
+          <div class="toolbar-stacked"><div class="filter-bar" style="grid-template-columns:minmax(220px,1fr) auto auto"><label style="margin:0">Danh mục thiết bị<select id="categoryDashboardSelect" onchange="renderCategoryDashboard()"></select></label><button class="secondary" onclick="resetCategoryDashboard()">Mặc định Laptop</button><button class="secondary" onclick="exportCategoryDashboardReport()">Xuất báo cáo</button></div></div>
+          <div id="categoryDashboardStats" class="stats-grid"></div>
+          <div class="card" style="padding:16px;margin-bottom:14px"><h3 style="margin-bottom:10px">Phân bổ số lượng</h3><div id="categoryDashboardBars" class="dashboard-alert-grid"></div></div>
+          <div class="card table-card"><table class="table"><thead><tr><th>Mã</th><th>Tên thiết bị/vật tư</th><th>Kho còn</th><th>Đã sử dụng</th><th>Đang mượn</th><th>Hỏng</th><th>Sửa chữa</th><th>Tổng ghi nhận</th><th>Tình trạng</th></tr></thead><tbody id="categoryDashboardRows"></tbody></table></div>
+          <div class="card table-card" style="margin-top:14px"><div style="padding:14px 16px"><h3>Phiếu mượn – trả thuộc danh mục</h3><p class="muted">Bao gồm nguồn mượn, người mượn, đã trả và số còn phải trả.</p></div><table class="table"><thead><tr><th>Mã phiếu</th><th>Thiết bị</th><th>Nguồn</th><th>Người mượn</th><th>Ngày mượn</th><th>Mượn</th><th>Đã trả</th><th>Còn</th><th>Trạng thái</th></tr></thead><tbody id="categoryDashboardLoans"></tbody></table></div>
         </div>
               <div id="overviewLoansPanel" class="overview-tab-panel hidden">
         <div class="dashboard-section-heading"><div><h2>Quản lý cho mượn – trả thiết bị</h2><p class="muted">Theo dõi thiết bị mượn theo mã riêng hoặc vật tư mượn theo số lượng. Hạn trả không bắt buộc.</p></div><button class="primary admin-only" onclick="openLoanForm()">＋ Lập phiếu cho mượn</button></div>
