@@ -1235,10 +1235,12 @@ function renderDisposition() {
   set("dispositionTotal", counts.total); set("dispositionDisposed", counts.disposed); set("dispositionDamaged", counts.damaged); set("dispositionRepair", counts.repair);
   body.innerHTML = filtered.map(r => {
     let action = `<span class="muted" title="Không có thao tác phù hợp cho trạng thái này">—</span>`;
-    if (r.type === "Hỏng / Bảo hành") {
-      action = `<button type="button" class="icon-action" title="Chuyển sang sửa chữa" aria-label="Chuyển sang sửa chữa" onclick="openRepairStartMovement('${escapeAttr(r.code)}','${escapeAttr(r.type)}','${escapeAttr(r.location)}')">🛠</button>`;
-    } else if (r.type === "Đang sửa chữa") {
-      action = `<button type="button" class="icon-action" title="Nhận lại sau sửa chữa/bảo hành" aria-label="Nhận lại sau sửa chữa/bảo hành" onclick="openRepairReturnMovement('${escapeAttr(r.code)}','${escapeAttr(r.type)}','${escapeAttr(r.location)}')">↩</button>`;
+    if (r.type === "Hỏng / Bảo hành" || r.type === "Đang sửa chữa") {
+      // Hiện cả hai thao tác để cho phép quy trình đầy đủ hoặc nhận lại trực tiếp nếu bỏ qua bước chuyển sửa chữa.
+      action = `<div class="disposition-actions">
+        <button type="button" class="icon-action" title="Chuyển sang sửa chữa" aria-label="Chuyển sang sửa chữa" onclick="openRepairStartMovement('${escapeAttr(r.code)}','${escapeAttr(r.type)}','${escapeAttr(r.location)}')">🛠</button>
+        <button type="button" class="icon-action" title="Nhận lại sau sửa chữa/bảo hành" aria-label="Nhận lại sau sửa chữa/bảo hành" onclick="openRepairReturnMovement('${escapeAttr(r.code)}','${escapeAttr(r.type)}','${escapeAttr(r.location)}')">↩</button>
+      </div>`;
     }
     return `<tr><td><b>${escapeHtml(r.code)}</b></td><td>${escapeHtml(r.name||"")}</td><td>${escapeHtml(r.category||"")}</td><td><span class="badge ${r.type==="Thanh lý"?"badge-danger":"badge-secondary"}">${escapeHtml(r.type)}</span></td><td><b>${escapeHtml(r.location)}</b></td><td>${Number(r.quantity).toLocaleString("vi-VN")} ${escapeHtml(r.unit)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note)}</td><td>${action}</td></tr>`;
   }).join("") || `<tr><td colspan="9" class="muted" style="text-align:center;padding:20px;">Không có thiết bị/vật tư phù hợp.</td></tr>`;
