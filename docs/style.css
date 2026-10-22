@@ -598,3 +598,18 @@ input,select { min-height:38px; }
 #loanTableBody td:last-child { min-width: 96px; }
 #movementTableBody { overflow: visible; }
 #movementTableBody td.movement-actions-cell { padding-right: 10px; }
+
+/* V5.2.29: ensure all movement action icons fit inside the visible table */
+#movements .table-card { overflow-x: auto; overflow-y: visible; }
+#movements table.table { width: 100%; min-width: 0; table-layout: fixed; }
+#movements table.table th:last-child,
+#movements table.table td.movement-actions-cell { width: 124px; min-width: 124px; max-width: 124px; padding-left: 6px; padding-right: 6px; }
+#movements .movement-action-icons { display: flex; flex-wrap: nowrap; gap: 3px; width: 100%; min-width: 0; overflow: visible; }
+#movements .movement-action-icons .icon-action { flex: 0 0 27px; width: 27px; min-width: 27px; height: 28px; padding: 0; }
+#movements table.table th:not(:last-child), #movements table.table td:not(:last-child) { overflow-wrap: anywhere; }
+#movements table.table td:nth-child(6) { font-size: 12px; }
+@media (max-width: 900px) {
+  #movements table.table { min-width: 900px; table-layout: auto; }
+  #movements table.table th:last-child,
+  #movements table.table td.movement-actions-cell { min-width: 124px; width: 124px; }
+}
