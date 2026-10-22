@@ -682,3 +682,15 @@ input,select { min-height:38px; }
   #categoryDashboardStats > .stat-card { padding: 12px; }
   #categoryDashboardBars > .dashboard-alert-card { padding: 9px; }
 }
+
+/* V5.2.36: luôn hiển thị song song hai thao tác xử lý hỏng/sửa chữa */
+.disposition-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.disposition-actions .icon-action {
+  flex: 0 0 auto;
+}
