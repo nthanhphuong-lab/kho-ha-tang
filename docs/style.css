@@ -645,3 +645,40 @@ input,select { min-height:38px; }
   #overviewInventoryPanel > .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; }
   #overviewInventoryPanel > .stats-grid > .stat-card { padding: 12px; }
 }
+
+/* V5.2.32: compact category dashboard cards; keep one row when space allows */
+#categoryDashboardStats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+#categoryDashboardStats > .stat-card {
+  min-width: 0;
+  padding: 14px 16px;
+}
+#categoryDashboardStats > .stat-card .muted {
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+#categoryDashboardStats > .stat-card h2 {
+  font-size: clamp(1.25rem, 1.8vw, 1.8rem);
+}
+#categoryDashboardBars {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+#categoryDashboardBars > .dashboard-alert-card {
+  padding: 10px 12px;
+  min-width: 0;
+  font-size: .9rem;
+}
+@media (max-width: 1000px) {
+  #categoryDashboardStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #categoryDashboardBars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  #categoryDashboardStats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  #categoryDashboardBars { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  #categoryDashboardStats > .stat-card { padding: 12px; }
+  #categoryDashboardBars > .dashboard-alert-card { padding: 9px; }
+}
