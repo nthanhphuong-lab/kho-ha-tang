@@ -490,9 +490,12 @@ input,select { min-height:38px; }
 .loan-delete-btn{background:#fff1f2;color:#b91c1c;border:1px solid #fecdd3;border-radius:8px;padding:7px 10px;cursor:pointer;font:inherit;font-size:.875rem}.loan-delete-btn:hover{background:#ffe4e6}
 
 /* V5.2.23: compact allocation details in category dashboard */
-.usage-allocation-details { min-width: 145px; max-width: 230px; }
-.usage-allocation-details summary { cursor: pointer; color: #1d4ed8; font-size: 13px; font-weight: 600; white-space: nowrap; }
-.usage-allocation-details ul { margin: 8px 0 4px; padding-left: 18px; min-width: 190px; white-space: normal; }
+/* V5.2.25: keep allocation summary inside its own table cell; show full list as an overlay */
+#overviewCategoryStatsPanel #categoryDashboardRows td:nth-child(5) { position: relative; overflow: visible; }
+.usage-allocation-details { position: relative; display: block; width: 100%; min-width: 0; max-width: 100%; }
+.usage-allocation-details summary { cursor: pointer; color: #1d4ed8; font-size: 12px; font-weight: 600; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+.usage-allocation-details[open] { z-index: 20; }
+.usage-allocation-details ul { position: absolute; z-index: 30; top: 100%; left: 0; margin: 5px 0 0; padding: 10px 10px 10px 26px; width: max-content; min-width: 220px; max-width: min(340px, 70vw); max-height: 240px; overflow: auto; white-space: normal; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,.18); }
 .usage-allocation-details li { margin: 0 0 5px; line-height: 1.4; }
 
 /* V5.2.24: compact category dashboard tables to fit the available viewport */
