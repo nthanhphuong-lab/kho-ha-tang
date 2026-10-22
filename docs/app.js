@@ -1233,9 +1233,34 @@ function renderDisposition() {
   const counts = { total: all.reduce((n,r)=>n+r.quantity,0), disposed: all.filter(r=>r.type==="Thanh lý").reduce((n,r)=>n+r.quantity,0), damaged: all.filter(r=>r.type.toLowerCase().includes("hỏng")||r.type.includes("Bảo hành")).reduce((n,r)=>n+r.quantity,0), repair: all.filter(r=>r.type.toLowerCase().includes("sửa chữa")).reduce((n,r)=>n+r.quantity,0) };
   const set = (id,val) => { const el=document.getElementById(id); if(el) el.textContent=Number(val).toLocaleString("vi-VN"); };
   set("dispositionTotal", counts.total); set("dispositionDisposed", counts.disposed); set("dispositionDamaged", counts.damaged); set("dispositionRepair", counts.repair);
-  body.innerHTML = filtered.map(r => `<tr><td><b>${escapeHtml(r.code)}</b></td><td>${escapeHtml(r.name||"")}</td><td>${escapeHtml(r.category||"")}</td><td><span class="badge ${r.type==="Thanh lý"?"badge-danger":"badge-secondary"}">${escapeHtml(r.type)}</span></td><td><b>${escapeHtml(r.location)}</b></td><td>${Number(r.quantity).toLocaleString("vi-VN")} ${escapeHtml(r.unit)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note)}</td></tr>`).join("") || `<tr><td colspan="8" class="muted" style="text-align:center;padding:20px;">Không có thiết bị/vật tư phù hợp.</td></tr>`;
+  body.innerHTML = filtered.map(r => {
+    const canReceiveAfterRepair = ["Hỏng / Bảo hành", "Đang sửa chữa"].includes(r.type);
+    const action = canReceiveAfterRepair
+      ? `<button type="button" class="icon-action" title="Nhận lại sau sửa chữa/bảo hành" aria-label="Nhận lại sau sửa chữa/bảo hành" onclick="openRepairReturnMovement('${escapeAttr(r.code)}','${escapeAttr(r.type)}','${escapeAttr(r.location)}')">↩</button>`
+      : `<span class="muted" title="Không có thao tác nhận lại cho trạng thái này">—</span>`;
+    return `<tr><td><b>${escapeHtml(r.code)}</b></td><td>${escapeHtml(r.name||"")}</td><td>${escapeHtml(r.category||"")}</td><td><span class="badge ${r.type==="Thanh lý"?"badge-danger":"badge-secondary"}">${escapeHtml(r.type)}</span></td><td><b>${escapeHtml(r.location)}</b></td><td>${Number(r.quantity).toLocaleString("vi-VN")} ${escapeHtml(r.unit)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.note)}</td><td>${action}</td></tr>`;
+  }).join("") || `<tr><td colspan="9" class="muted" style="text-align:center;padding:20px;">Không có thiết bị/vật tư phù hợp.</td></tr>`;
   const count = document.getElementById("dispositionResultCount"); if(count) count.textContent=`Hiển thị ${filtered.length} dòng quản lý xử lý`;
   applyTablePagination("dispositionTableBody", "disposition");
+}
+// Mở sẵn phiếu nhận lại sau sửa chữa/bảo hành từ danh sách theo dõi.
+function openRepairReturnMovement(deviceCode, rowType, location) {
+  const dev = STATE.devices.find(d => String(d.code).toLowerCase() === String(deviceCode).toLowerCase());
+  if (!dev) return alert("Không tìm thấy thiết bị. Hãy tải lại dữ liệu rồi thử lại.");
+  openMovementModal(dev.code);
+  setElementValueSafe("movType", "Đã sửa xong / Nhập lại kho", true);
+  const source = document.getElementById("movDamageSourceType");
+  if (source) source.value = "warehouse";
+  // Chọn vị trí nguồn nếu vị trí này là kho đang theo dõi hỏng/sửa chữa.
+  const from = document.getElementById("movFromLocation");
+  if (from && Array.from(from.options).some(o => o.value === location)) from.value = location;
+  const note = document.getElementById("movNote");
+  if (note && !note.value) note.value = `Nhận lại sau sửa chữa/bảo hành (${rowType})`;
+  const title = document.getElementById("movementModalTitle");
+  if (title) title.textContent = `Nhận lại sau sửa chữa/bảo hành — ${dev.code}`;
+  handleMovementTypeChange();
+  // handleMovementTypeChange có thể làm mới danh sách nguồn; đặt lại nguồn sau khi cập nhật.
+  if (from && Array.from(from.options).some(o => o.value === location)) from.value = location;
 }
 function exportDispositionCSV() {
   const rows = getFilteredDispositionRows();
