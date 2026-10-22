@@ -169,9 +169,17 @@ header h1 { letter-spacing:-.025em; }
 .card { box-shadow:0 2px 8px rgba(15,23,42,.035); }
 .stat-card { min-height:112px; border-top:3px solid #cbd5e1; }
 .stats-grid .stat-card:nth-child(1) { border-top-color:#2563eb; }
+.stats-grid .stat-card:nth-child(1) h2 { color:#1d4ed8; }
 .stats-grid .stat-card:nth-child(2) { border-top-color:#16a34a; }
+.stats-grid .stat-card:nth-child(2) h2 { color:#15803d; }
 .stats-grid .stat-card:nth-child(3) { border-top-color:#7c3aed; }
+.stats-grid .stat-card:nth-child(3) h2 { color:#6d28d9; }
 .stats-grid .stat-card:nth-child(4) { border-top-color:#ea580c; }
+.stats-grid .stat-card:nth-child(4) h2 { color:#c2410c; }
+.stats-grid .stat-card.stat-loaned { border-top-color:#0891b2; }
+.stats-grid .stat-card.stat-loaned h2 { color:#0e7490; }
+#overviewInventoryPanel > .stats-grid { grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); }
+@media(max-width:480px) { #overviewInventoryPanel > .stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 .dashboard-quick-card,.dashboard-recent-card { padding:16px; margin-top:14px; }
 .dashboard-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
 .dashboard-section-heading h3 { margin:0 0 4px; }
@@ -612,4 +620,28 @@ input,select { min-height:38px; }
   #movements table.table { min-width: 900px; table-layout: auto; }
   #movements table.table th:last-child,
   #movements table.table td.movement-actions-cell { min-width: 124px; width: 124px; }
+}
+
+/* V5.2.31: keep all five overview KPI cards on one row on desktop */
+#overviewInventoryPanel > .stats-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 12px;
+}
+#overviewInventoryPanel > .stats-grid > .stat-card {
+  min-width: 0;
+  padding: 1.15rem 1.25rem;
+}
+#overviewInventoryPanel > .stats-grid > .stat-card .muted {
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+#overviewInventoryPanel > .stats-grid > .stat-card h2 {
+  font-size: clamp(1.45rem, 2vw, 2rem);
+}
+@media (max-width: 900px) {
+  #overviewInventoryPanel > .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 600px) {
+  #overviewInventoryPanel > .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; }
+  #overviewInventoryPanel > .stats-grid > .stat-card { padding: 12px; }
 }
