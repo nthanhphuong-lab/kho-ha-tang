@@ -62,6 +62,9 @@
         <button class="nav-btn" title="Xuất / Nhập / Sự cố" aria-label="Xuất / Nhập / Sự cố" onclick="showView('movements')">
           <span class="icon">🔄</span> <span>Xuất / Nhập / Sự cố</span>
         </button>
+        <button class="nav-btn" title="Biên bản giao dịch" aria-label="Biên bản giao dịch" onclick="showView('documents')">
+          <span class="icon">📄</span> <span>Biên bản giao dịch</span>
+        </button>
         <button class="nav-btn" title="Theo dõi hỏng / thanh lý" aria-label="Theo dõi hỏng / thanh lý" onclick="showView('disposition')">
           <span class="icon">🧰</span> <span>Theo dõi hỏng / thanh lý</span>
         </button>
@@ -380,6 +383,11 @@
       </section>
 
 
+      <section id="documents" class="view hidden">
+        <div class="toolbar"><div><h2>Biên bản giao dịch</h2><p class="muted">Lập biên bản từ phiếu giao dịch đã có. Biên bản được lưu chung trong data/kho.json để tra cứu và in lại; không làm thay đổi tồn kho.</p></div></div>
+        <div class="card" style="margin-bottom:14px"><h3 style="margin-top:0">Tạo biên bản từ giao dịch</h3><p class="muted">Vào Lịch sử điều chuyển & sự cố hoặc danh sách Cho mượn – Trả thiết bị, bấm nút “Lập biên bản” trên dòng giao dịch.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" onclick="showView('movements')">Mở lịch sử giao dịch</button><button class="secondary" onclick="showView('dashboard');showOverviewTab('loans')">Mở phiếu mượn – trả</button></div></div>
+        <div class="card table-card"><div class="toolbar"><h3>Biên bản đã lưu</h3><button class="secondary" onclick="renderTransactionDocuments()">Làm mới</button></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Ngày lập</th><th>Mã biên bản</th><th>Loại biên bản</th><th>Giao dịch nguồn</th><th>Người / đơn vị liên quan</th><th>Người lập</th><th>Thao tác</th></tr></thead><tbody id="transactionDocumentsBody"></tbody></table></div></div>
+      </section>
       <section id="disposition" class="view hidden">
         <div class="toolbar">
           <div>
