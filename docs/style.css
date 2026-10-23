@@ -706,3 +706,35 @@ input,select { min-height:38px; }
   #loanTableBody .loan-borrower-cell { width:110px; max-width:110px; min-width:95px; }
   #loanTableBody .loan-borrower-name, #loanTableBody .loan-borrower-department { max-width:110px; }
 }
+
+
+/* V5.2.43: hiển thị trọn bảng phiếu mượn, tránh thanh cuộn ngang trên màn hình máy tính */
+#overviewLoansPanel .table-card { width:100%; max-width:100%; min-width:0; overflow-x:hidden; overflow-y:visible; }
+#overviewLoansPanel table.table { width:100%; min-width:0 !important; table-layout:fixed; }
+#overviewLoansPanel table.table th,
+#overviewLoansPanel table.table td { padding:8px 6px; font-size:12px; overflow-wrap:anywhere; word-break:normal; }
+#overviewLoansPanel table.table th { white-space:normal; font-size:11px; line-height:1.25; }
+#overviewLoansPanel table.table th:nth-child(1), #overviewLoansPanel table.table td:nth-child(1) { width:4%; padding-left:5px; padding-right:3px; }
+#overviewLoansPanel table.table th:nth-child(2), #overviewLoansPanel table.table td:nth-child(2) { width:12%; }
+#overviewLoansPanel table.table th:nth-child(3), #overviewLoansPanel table.table td:nth-child(3) { width:15%; }
+#overviewLoansPanel table.table th:nth-child(4), #overviewLoansPanel table.table td:nth-child(4) { width:15%; }
+#overviewLoansPanel table.table th:nth-child(5), #overviewLoansPanel table.table td:nth-child(5) { width:9%; }
+#overviewLoansPanel table.table th:nth-child(6), #overviewLoansPanel table.table td:nth-child(6) { width:10%; }
+#overviewLoansPanel table.table th:nth-child(7), #overviewLoansPanel table.table td:nth-child(7) { width:11%; }
+#overviewLoansPanel table.table th:nth-child(8), #overviewLoansPanel table.table td:nth-child(8) { width:9%; }
+#overviewLoansPanel table.table th:nth-child(9), #overviewLoansPanel table.table td:nth-child(9) { width:15%; }
+#overviewLoansPanel #loanTableBody .loan-borrower-cell { width:auto; max-width:none; min-width:0; }
+#overviewLoansPanel #loanTableBody .loan-borrower-name,
+#overviewLoansPanel #loanTableBody .loan-borrower-department { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#overviewLoansPanel #loanTableBody td:last-child { min-width:0; padding-left:3px; padding-right:3px; }
+#overviewLoansPanel .loan-action-icons { gap:2px; flex-wrap:nowrap; }
+#overviewLoansPanel .loan-action-icons .icon-action { flex:0 1 26px; width:26px; min-width:22px; height:27px; }
+@media(max-width:640px) {
+  #overviewLoansPanel table.table th, #overviewLoansPanel table.table td { padding:6px 3px; font-size:10px; }
+  #overviewLoansPanel table.table th { font-size:9px; }
+  #overviewLoansPanel table.table th:nth-child(2), #overviewLoansPanel table.table td:nth-child(2) { width:13%; }
+  #overviewLoansPanel table.table th:nth-child(3), #overviewLoansPanel table.table td:nth-child(3) { width:14%; }
+  #overviewLoansPanel table.table th:nth-child(4), #overviewLoansPanel table.table td:nth-child(4) { width:14%; }
+  #overviewLoansPanel table.table th:nth-child(9), #overviewLoansPanel table.table td:nth-child(9) { width:14%; }
+  #overviewLoansPanel .loan-action-icons .icon-action { flex:0 1 21px; width:21px; min-width:18px; height:24px; font-size:13px; }
+}
