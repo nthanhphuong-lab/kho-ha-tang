@@ -694,3 +694,15 @@ input,select { min-height:38px; }
 .disposition-actions .icon-action {
   flex: 0 0 auto;
 }
+
+
+/* V5.2.40: thu gọn cột người mượn/đơn vị trong danh sách phiếu mượn */
+#loanTableBody .loan-borrower-cell { width: 135px; max-width: 135px; min-width: 120px; }
+#loanTableBody .loan-borrower-name,
+#loanTableBody .loan-borrower-department { display:block; max-width:135px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.45; }
+#loanTableBody .loan-borrower-name { font-weight:500; }
+#loanTableBody .loan-borrower-department { color:#64748b; font-size:.72rem; }
+@media (max-width: 900px) {
+  #loanTableBody .loan-borrower-cell { width:110px; max-width:110px; min-width:95px; }
+  #loanTableBody .loan-borrower-name, #loanTableBody .loan-borrower-department { max-width:110px; }
+}
