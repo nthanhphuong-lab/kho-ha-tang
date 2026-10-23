@@ -385,7 +385,7 @@
 
       <section id="documents" class="view hidden">
         <div class="toolbar"><div><h2>Biên bản giao dịch</h2><p class="muted">Lập biên bản từ phiếu giao dịch đã có. Biên bản được lưu chung trong data/kho.json để tra cứu và in lại; không làm thay đổi tồn kho.</p></div></div>
-        <div class="card" style="margin-bottom:14px"><h3 style="margin-top:0">Tạo biên bản từ giao dịch</h3><p class="muted">Vào Lịch sử điều chuyển & sự cố hoặc danh sách Cho mượn – Trả thiết bị, bấm nút “Lập biên bản” trên dòng giao dịch.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" onclick="showView('movements')">Mở lịch sử giao dịch</button><button class="secondary" onclick="showView('dashboard');showOverviewTab('loans')">Mở phiếu mượn – trả</button></div></div>
+        <div class="card" style="margin-bottom:14px"><h3 style="margin-top:0">Tạo biên bản từ giao dịch</h3><p class="muted">Lập biên bản từ lịch sử giao dịch kho. Phiếu mượn – trả đã có chức năng in biên bản bàn giao riêng; dùng mục này để chỉnh sửa, lưu và in lại các biên bản giao dịch đã lập.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" onclick="showView('movements')">Mở lịch sử giao dịch kho</button></div></div>
         <div class="card table-card"><div class="toolbar"><h3>Biên bản đã lưu</h3><button class="secondary" onclick="renderTransactionDocuments()">Làm mới</button></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Ngày lập</th><th>Mã biên bản</th><th>Loại biên bản</th><th>Giao dịch nguồn</th><th>Người / đơn vị liên quan</th><th>Người lập</th><th>Thao tác</th></tr></thead><tbody id="transactionDocumentsBody"></tbody></table></div></div>
       </section>
       <section id="disposition" class="view hidden">
