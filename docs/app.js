@@ -2,6 +2,8 @@ let STATE = {
   devices: [],
   movements: [],
   loans: [],
+  documents: [],
+  purchaseBatches: [],
   categories: [],
   categoryUnits: {},
   locations: [],
@@ -246,13 +248,14 @@ function updateViewHistoryButtons() {
 }
 
 function showOverviewTab(tab = "inventory") {
-  const tabs = { inventory: ["overviewInventoryPanel","overviewInventoryTab"], loans: ["overviewLoansPanel","overviewLoansTab"], categoryStats: ["overviewCategoryStatsPanel","overviewCategoryTab"] };
+  const tabs = { inventory: ["overviewInventoryPanel","overviewInventoryTab"], loans: ["overviewLoansPanel","overviewLoansTab"], categoryStats: ["overviewCategoryStatsPanel","overviewCategoryTab"], purchaseBatchStats: ["overviewPurchaseBatchStatsPanel","overviewPurchaseBatchTab"] };
   Object.entries(tabs).forEach(([key, ids]) => {
     const panel=document.getElementById(ids[0]), button=document.getElementById(ids[1]);
     panel?.classList.toggle("hidden", key!==tab); button?.classList.toggle("active",key===tab); button?.setAttribute("aria-selected",String(key===tab));
   });
   if (tab === "loans") renderLoans();
   if (tab === "categoryStats") renderCategoryDashboard();
+  if (tab === "purchaseBatchStats") renderPurchaseBatchDashboard();
 }
 
 function showView(viewId, options = {}) {
@@ -365,6 +368,7 @@ async function loadState() {
     STATE.movements = data.movements || [];
     STATE.loans = Array.isArray(data.loans) ? data.loans : [];
     STATE.documents = Array.isArray(data.documents) ? data.documents : [];
+    STATE.purchaseBatches = Array.isArray(data.purchaseBatches) ? data.purchaseBatches : [];
     STATE.categories = data.categories || [];
     STATE.categoryUnits = data.categoryUnits || {};
     STATE.locations = data.locations || [
@@ -1963,6 +1967,85 @@ function exportCategoryDashboardReport(){
  out.push([],['PHIẾU MƯỢN – TRẢ'],['Mã phiếu','Mã thiết bị','Tên thiết bị','Nguồn','Vị trí nguồn','Người mượn','Đơn vị','Ngày mượn','Hạn trả','Số lượng','Đã trả','Còn phải trả','Mục đích','Nơi sử dụng','Người bàn giao','Ghi chú']);
  for(const l of (STATE.loans||[]).filter(l=>rows.some(r=>String(r.device.code)===String(l.deviceCode))))out.push([l.id,l.deviceCode,l.deviceName,l.sourceType==='usage'?'Nơi sử dụng':'Kho',l.sourceLocation,l.borrower,l.department,l.loanDate,l.dueDate||'Không xác định',l.quantity,l.returnedQuantity||0,Math.max(0,Number(l.quantity||0)-Number(l.returnedQuantity||0)),l.purpose,l.place,l.handoverBy,l.note]);
  downloadCSV(`bao-cao-danh-muc-${category.replace(/[^\w\-]+/g,'_')}.csv`,out);
+}
+
+// QUẢN LÝ ĐỢT MUA + THỐNG KÊ THEO ĐỢT
+let purchaseBatchDraftItems = [];
+function nextPurchaseBatchCode(){
+ const year=new Date().getFullYear(), prefix=`DM-${year}-`;
+ const nums=(STATE.purchaseBatches||[]).map(b=>String(b.code||"")).filter(c=>c.startsWith(prefix)).map(c=>Number(c.slice(prefix.length))).filter(Number.isFinite);
+ return `${prefix}${String(Math.max(0,...nums)+1).padStart(3,"0")}`;
+}
+function openPurchaseBatchForm(){
+ if(STATE.currentUser?.role!=="admin")return alert("Chỉ quản trị viên mới được tạo đợt mua.");
+ const devices=(STATE.devices||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
+ if(!devices.length)return alert("Danh mục thiết bị hiện chưa có thiết bị để chọn.");
+ const select=document.getElementById("purchaseBatchDevice");
+ select.innerHTML=devices.map(d=>`<option value="${escapeAttr(d.code)}">${escapeHtml(d.code)} — ${escapeHtml(d.name)}</option>`).join("");
+ ["purchaseBatchName","purchaseBatchDecision","purchaseBatchContract","purchaseBatchPurchaseDate","purchaseBatchFunding","purchaseBatchValue","purchaseBatchNote"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+ const date=document.getElementById("purchaseBatchDate");if(date)date.value=new Date().toISOString().slice(0,10);
+ document.getElementById("purchaseBatchQty").value="1";
+ purchaseBatchDraftItems=[];renderPurchaseBatchDraftRows();showModalById("purchaseBatchModal");
+}
+function addPurchaseBatchItemDraft(){
+ const code=document.getElementById("purchaseBatchDevice")?.value, qty=Number(document.getElementById("purchaseBatchQty")?.value);
+ const d=(STATE.devices||[]).find(x=>String(x.code)===String(code));
+ if(!d)return alert("Vui lòng chọn thiết bị.");
+ if(!Number.isInteger(qty)||qty<=0)return alert("Số lượng đề nghị phải là số nguyên lớn hơn 0.");
+ const old=purchaseBatchDraftItems.find(x=>x.deviceCode===code);
+ if(old)old.requestedQuantity+=qty;else purchaseBatchDraftItems.push({deviceCode:d.code,deviceName:d.name,category:d.category,unit:d.unit||"cái",requestedQuantity:qty});
+ renderPurchaseBatchDraftRows();
+}
+function removePurchaseBatchDraftItem(code){purchaseBatchDraftItems=purchaseBatchDraftItems.filter(x=>x.deviceCode!==code);renderPurchaseBatchDraftRows();}
+function renderPurchaseBatchDraftRows(){
+ const body=document.getElementById("purchaseBatchDraftRows");if(!body)return;
+ body.innerHTML=purchaseBatchDraftItems.map(x=>`<tr><td>${escapeHtml(x.deviceCode)}</td><td>${escapeHtml(x.deviceName)}</td><td>${x.requestedQuantity} ${escapeHtml(x.unit)}</td><td><button class="icon-action icon-action-danger" type="button" onclick="removePurchaseBatchDraftItem('${escapeAttr(x.deviceCode)}')" title="Bỏ thiết bị">⌫</button></td></tr>`).join("")||'<tr><td colspan="4" class="muted">Chưa thêm thiết bị.</td></tr>';
+}
+async function savePurchaseBatch(){
+ const name=document.getElementById("purchaseBatchName")?.value.trim(),date=document.getElementById("purchaseBatchDate")?.value;
+ if(!name||!date)return alert("Vui lòng nhập Tên đợt mua và Ngày đề nghị mua.");
+ if(!purchaseBatchDraftItems.length)return alert("Vui lòng thêm ít nhất một thiết bị vào đợt mua.");
+ const batch={id:`PB-${Date.now()}`,code:nextPurchaseBatchCode(),name,requestDate:date,decisionNo:document.getElementById("purchaseBatchDecision")?.value.trim()||"",contractNo:document.getElementById("purchaseBatchContract")?.value.trim()||"",purchaseDate:document.getElementById("purchaseBatchPurchaseDate")?.value||"",fundingSource:document.getElementById("purchaseBatchFunding")?.value.trim()||"",value:Number(document.getElementById("purchaseBatchValue")?.value)||0,note:document.getElementById("purchaseBatchNote")?.value.trim()||"",items:purchaseBatchDraftItems.map(x=>({...x})),createdAt:new Date().toISOString()};
+ try{await callMutate("purchase-batch.save",{batch});await loadState();closeModal("purchaseBatchModal");showOverviewTab("purchaseBatchStats");alert(`Đã lưu đợt mua ${batch.code}.`);}catch(e){}
+}
+function populatePurchaseBatchSelect(){
+ const el=document.getElementById("purchaseBatchSelect");if(!el)return;
+ const previous=el.value;
+ const batches=(STATE.purchaseBatches||[]).slice().sort((a,b)=>String(b.requestDate||"").localeCompare(String(a.requestDate||"")));
+ el.innerHTML=batches.map(b=>`<option value="${escapeAttr(b.id)}">${escapeHtml(b.code)} — ${escapeHtml(b.name)}</option>`).join("");
+ if(previous&&batches.some(b=>b.id===previous))el.value=previous;else if(batches.length)el.value=batches[0].id;
+}
+function renderPurchaseBatchDashboard(){
+ const select=document.getElementById("purchaseBatchSelect");if(!select)return;
+ populatePurchaseBatchSelect();
+ const batch=(STATE.purchaseBatches||[]).find(b=>b.id===select.value);
+ const info=document.getElementById("purchaseBatchInfo"),stats=document.getElementById("purchaseBatchStats"),body=document.getElementById("purchaseBatchRows"),loansBody=document.getElementById("purchaseBatchLoans");
+ if(!batch){
+  if(info)info.innerHTML='<span class="muted">Chưa có đợt mua. Bấm “Tạo đợt mua” để bắt đầu theo dõi.</span>';
+  if(stats)stats.innerHTML="";if(body)body.innerHTML='<tr><td colspan="5" class="muted">Chưa có dữ liệu đợt mua.</td></tr>';if(loansBody)loansBody.innerHTML="";return;
+ }
+ const total=(batch.items||[]).reduce((s,x)=>s+Math.max(0,Number(x.requestedQuantity)||0),0);
+ if(info)info.innerHTML=`<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3 style="margin:0 0 6px">${escapeHtml(batch.name)}</h3><div class="muted">Mã đợt: <b>${escapeHtml(batch.code)}</b> · Ngày đề nghị mua: ${escapeHtml(batch.requestDate||"—")}</div><div class="muted">Quyết định: ${escapeHtml(batch.decisionNo||"—")} · Hợp đồng: ${escapeHtml(batch.contractNo||"—")} · Nguồn kinh phí: ${escapeHtml(batch.fundingSource||"—")}</div></div><div>${STATE.currentUser?.role==="admin"?`<button class="secondary" onclick="deletePurchaseBatch('${escapeAttr(batch.id)}')">Xóa đợt mua</button>`:""}</div></div>`;
+ const cards=[["Số mặt hàng",(batch.items||[]).length],["Tổng số lượng đề nghị",total],["Đã nhập kho","Chưa liên kết"],["Đã cấp sử dụng","Chưa liên kết"],["Đang cho mượn","Chưa liên kết"],["Hỏng / sửa chữa","Chưa liên kết"]];
+ if(stats)stats.innerHTML=cards.map(([label,value])=>`<div class="card stat-card"><span class="muted">${label}</span><h2 style="font-size:${typeof value==="number"?"1.5rem":"1rem"}">${typeof value==="number"?value.toLocaleString("vi-VN"):value}</h2></div>`).join("");
+ if(body)body.innerHTML=(batch.items||[]).map(x=>`<tr><td><b>${escapeHtml(x.deviceCode)}</b></td><td>${escapeHtml(x.deviceName)}</td><td>${Number(x.requestedQuantity)||0}</td><td>${escapeHtml(x.unit||"cái")}</td><td>${escapeHtml(x.category||"")}</td></tr>`).join("")||'<tr><td colspan="5" class="muted">Đợt mua chưa có thiết bị.</td></tr>';
+ const codes=new Set((batch.items||[]).map(x=>String(x.deviceCode)));
+ const loans=(STATE.loans||[]).filter(l=>codes.has(String(l.deviceCode)));
+ if(loansBody)loansBody.innerHTML=loans.map(l=>`<tr><td>${escapeHtml(l.id)}</td><td>${escapeHtml(l.deviceCode)} — ${escapeHtml(l.deviceName)}</td><td>${escapeHtml(l.borrower||"")}</td><td>${escapeHtml(l.department||"")}</td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${Number(l.quantity)||0}</td><td>${Number(l.returnedQuantity)||0}</td><td>${loanActiveQty(l)}</td></tr>`).join("")||'<tr><td colspan="8" class="muted">Chưa có phiếu mượn liên quan.</td></tr>';
+}
+async function deletePurchaseBatch(id){
+ if(STATE.currentUser?.role!=="admin")return alert("Chỉ quản trị viên mới được xóa đợt mua.");
+ const batch=(STATE.purchaseBatches||[]).find(b=>b.id===id);if(!batch)return;
+ if(!confirm(`Xóa đợt mua ${batch.code} – ${batch.name}? Thao tác này chỉ xóa hồ sơ đợt mua, không xóa thiết bị hoặc giao dịch kho.`))return;
+ try{await callMutate("purchase-batch.delete",{batchId:id});await loadState();renderPurchaseBatchDashboard();}catch(e){}
+}
+function exportPurchaseBatchReport(){
+ const batch=(STATE.purchaseBatches||[]).find(b=>b.id===document.getElementById("purchaseBatchSelect")?.value);
+ if(!batch)return alert("Chưa có đợt mua để xuất báo cáo.");
+ const rows=[["BÁO CÁO ĐỢT MUA"],["Mã đợt",batch.code],["Tên đợt",batch.name],["Ngày đề nghị mua",batch.requestDate],["Quyết định",batch.decisionNo||""],["Hợp đồng",batch.contractNo||""],["Ngày mua",batch.purchaseDate||""],["Nguồn kinh phí",batch.fundingSource||""],["Giá trị",batch.value||""],[],["Mã thiết bị","Tên thiết bị","Danh mục","Số lượng đề nghị","Đơn vị","Ghi chú"]];
+ (batch.items||[]).forEach(x=>rows.push([x.deviceCode,x.deviceName,x.category,x.requestedQuantity,x.unit,""]));
+ rows.push([],["GHI CHÚ","Báo cáo hiện ghi nhận số lượng đề nghị mua; số lượng nhập kho/cấp phát/trạng thái sẽ được cập nhật khi hoàn tất liên kết phân bổ đợt mua với giao dịch kho."]);
+ downloadCSV(`bao-cao-${batch.code}.csv`,rows);
 }
 
 // BÁO CÁO CSV
