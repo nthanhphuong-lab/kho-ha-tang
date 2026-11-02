@@ -1018,6 +1018,7 @@ function openMovementModal(deviceCode = null) {
   populateSelects(); showModalById("movementModal");
   setElementValueSafe("movType", "Xuất kho sử dụng", true);
   ["movNote", "movDepartment", "movRecipient", "movReferenceNo"].forEach(id => setElementValueSafe(id, ""));
+  setElementValueSafe("movPurchaseBatchId", "");
   if (deviceCode) setElementValueSafe("movDeviceCode", deviceCode, true);
   const chosen = STATE.devices.find(d => String(d.code).toLowerCase() === String(document.getElementById("movDeviceCode")?.value).toLowerCase());
   if (chosen?.status === "Đang sử dụng") setElementValueSafe("movType", "Điều chuyển nơi sử dụng", true);
@@ -1040,9 +1041,47 @@ function handleSelectDeviceForMovement() {
   }
   handleMovementTypeChange();
 }
+
+function populateMovementPurchaseBatchSelect() {
+  const select = document.getElementById("movPurchaseBatchId");
+  if (!select) return;
+  const deviceCode = document.getElementById("movDeviceCode")?.value || "";
+  const current = select.value;
+  const batches = (STATE.purchaseBatches || []).filter(batch =>
+    (batch.items || []).some(item => String(item.deviceCode || "").toLowerCase() === String(deviceCode).toLowerCase())
+  );
+  select.innerHTML = `<option value="">Không gắn với đợt mua</option>` + batches.map(batch => {
+    const item = (batch.items || []).find(x => String(x.deviceCode || "").toLowerCase() === String(deviceCode).toLowerCase());
+    const requested = Math.max(0, Number(item?.requestedQuantity) || 0);
+    const received = Math.max(0, Number(item?.receivedQuantity) || 0);
+    const remaining = Math.max(0, requested - received);
+    return `<option value="${escapeAttr(batch.id)}">${escapeHtml(batch.code)} – ${escapeHtml(batch.name)} (còn đề nghị nhập: ${remaining})</option>`;
+  }).join("");
+  if (batches.some(batch => batch.id === current)) select.value = current;
+  updateMovementPurchaseBatchHint();
+}
+function updateMovementPurchaseBatchHint() {
+  const select = document.getElementById("movPurchaseBatchId");
+  const hint = document.getElementById("movPurchaseBatchHint");
+  if (!select || !hint) return;
+  const batch = (STATE.purchaseBatches || []).find(x => x.id === select.value);
+  const code = document.getElementById("movDeviceCode")?.value || "";
+  const item = batch?.items?.find(x => String(x.deviceCode || "").toLowerCase() === String(code).toLowerCase());
+  if (!batch || !item) {
+    hint.textContent = "Chỉ chọn đợt mua khi hàng nhập thuộc đề nghị mua đã lập.";
+    return;
+  }
+  const requested = Math.max(0, Number(item.requestedQuantity) || 0);
+  const received = Math.max(0, Number(item.receivedQuantity) || 0);
+  hint.textContent = `Đề nghị: ${requested} ${item.unit || "cái"} · Đã nhập: ${received} · Còn có thể nhập: ${Math.max(0, requested - received)}.`;
+}
+
 function handleMovementTypeChange() {
   const type = document.getElementById("movType")?.value || "Xuất kho sử dụng";
   const isIn = type === "Nhập kho", isUseOut = type === "Xuất kho sử dụng", isTransfer = type === "Điều chuyển kho", isReturn = type === "Thu hồi về kho", isUseTransfer = type === "Điều chuyển nơi sử dụng", isRepair = type === "Đã sửa xong / Nhập lại kho", isSendRepair = type === "Chuyển sang sửa chữa", isDamage = type === "Báo hỏng / Đi bảo hành", isDispose = type === "Báo thanh lý";
+  const purchaseBatchWrap = document.getElementById("movPurchaseBatchWrap");
+  if (purchaseBatchWrap) purchaseBatchWrap.classList.toggle("hidden", !isIn);
+  if (isIn) populateMovementPurchaseBatchSelect();
   const sourceTypeEl = document.getElementById("movDamageSourceType");
   let sourceType = sourceTypeEl?.value || "warehouse";
   if (isDamage && !["warehouse", "usage"].includes(sourceType)) { sourceType = "warehouse"; if (sourceTypeEl) sourceTypeEl.value = sourceType; }
@@ -1092,7 +1131,8 @@ async function handleSaveMovement(e) {
       sourceUsage = dev.usageLocation || dev.location || fromUsage;
     }
   }
-  const payload = { deviceCode, type, sourceMode: damageSourceType, fromLocation: (isIn || isReturn || isUseTransfer || sourceUsage) ? "" : fromLocation, toLocation: (isUseOut || isUseTransfer) ? "" : toLocation, usageLocation: (isUseOut || isUseTransfer) ? usageLocation : "", fromUsageLocation: sourceUsage, quantity, department: document.getElementById("movDepartment")?.value.trim() || "", recipient: document.getElementById("movRecipient")?.value.trim() || "", referenceNo: document.getElementById("movReferenceNo")?.value.trim() || "", note: document.getElementById("movNote")?.value.trim() || "" };
+  const purchaseBatchId = isIn ? (document.getElementById("movPurchaseBatchId")?.value || "") : "";
+  const payload = { deviceCode, type, purchaseBatchId, sourceMode: damageSourceType, fromLocation: (isIn || isReturn || isUseTransfer || sourceUsage) ? "" : fromLocation, toLocation: (isUseOut || isUseTransfer) ? "" : toLocation, usageLocation: (isUseOut || isUseTransfer) ? usageLocation : "", fromUsageLocation: sourceUsage, quantity, department: document.getElementById("movDepartment")?.value.trim() || "", recipient: document.getElementById("movRecipient")?.value.trim() || "", referenceNo: document.getElementById("movReferenceNo")?.value.trim() || "", note: document.getElementById("movNote")?.value.trim() || "" };
   try { await callMutate("movement.create", payload); closeModal("movementModal"); await loadState(); } catch (err) { /* server validation already shown */ }
 }
 
@@ -1976,15 +2016,35 @@ function nextPurchaseBatchCode(){
  const nums=(STATE.purchaseBatches||[]).map(b=>String(b.code||"")).filter(c=>c.startsWith(prefix)).map(c=>Number(c.slice(prefix.length))).filter(Number.isFinite);
  return `${prefix}${String(Math.max(0,...nums)+1).padStart(3,"0")}`;
 }
+function getPurchaseBatchCategories(){
+ const names=[...new Set((STATE.devices||[]).map(d=>String(d.category||"").trim()||"Chưa phân nhóm"))];
+ return names.sort((a,b)=>a.localeCompare(b,"vi"));
+}
+function filterPurchaseBatchDevicesByCategory(){
+ const categoryEl=document.getElementById("purchaseBatchCategory");
+ const deviceEl=document.getElementById("purchaseBatchDevice");
+ if(!categoryEl||!deviceEl)return;
+ const category=categoryEl.value;
+ const devices=(STATE.devices||[]).filter(d=>(String(d.category||"").trim()||"Chưa phân nhóm")===category)
+  .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
+ const previous=deviceEl.value;
+ deviceEl.innerHTML=devices.map(d=>`<option value="${escapeAttr(d.code)}">${escapeHtml(d.code)} — ${escapeHtml(d.name)}</option>`).join("");
+ if(devices.some(d=>String(d.code)===previous))deviceEl.value=previous;
+}
 function openPurchaseBatchForm(){
  if(STATE.currentUser?.role!=="admin")return alert("Chỉ quản trị viên mới được tạo đợt mua.");
- const devices=(STATE.devices||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
+ const devices=(STATE.devices||[]).slice();
  if(!devices.length)return alert("Danh mục thiết bị hiện chưa có thiết bị để chọn.");
- const select=document.getElementById("purchaseBatchDevice");
- select.innerHTML=devices.map(d=>`<option value="${escapeAttr(d.code)}">${escapeHtml(d.code)} — ${escapeHtml(d.name)}</option>`).join("");
+ const categorySelect=document.getElementById("purchaseBatchCategory");
+ if(categorySelect){
+  const categories=getPurchaseBatchCategories();
+  categorySelect.innerHTML=categories.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join("");
+  categorySelect.value=categories[0]||"";
+ }
+ filterPurchaseBatchDevicesByCategory();
  ["purchaseBatchName","purchaseBatchDecision","purchaseBatchContract","purchaseBatchPurchaseDate","purchaseBatchFunding","purchaseBatchValue","purchaseBatchNote"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
  const date=document.getElementById("purchaseBatchDate");if(date)date.value=new Date().toISOString().slice(0,10);
- document.getElementById("purchaseBatchQty").value="1";
+ const qty=document.getElementById("purchaseBatchQty");if(qty)qty.value="1";
  purchaseBatchDraftItems=[];renderPurchaseBatchDraftRows();showModalById("purchaseBatchModal");
 }
 function addPurchaseBatchItemDraft(){
@@ -1999,13 +2059,13 @@ function addPurchaseBatchItemDraft(){
 function removePurchaseBatchDraftItem(code){purchaseBatchDraftItems=purchaseBatchDraftItems.filter(x=>x.deviceCode!==code);renderPurchaseBatchDraftRows();}
 function renderPurchaseBatchDraftRows(){
  const body=document.getElementById("purchaseBatchDraftRows");if(!body)return;
- body.innerHTML=purchaseBatchDraftItems.map(x=>`<tr><td>${escapeHtml(x.deviceCode)}</td><td>${escapeHtml(x.deviceName)}</td><td>${x.requestedQuantity} ${escapeHtml(x.unit)}</td><td><button class="icon-action icon-action-danger" type="button" onclick="removePurchaseBatchDraftItem('${escapeAttr(x.deviceCode)}')" title="Bỏ thiết bị">⌫</button></td></tr>`).join("")||'<tr><td colspan="4" class="muted">Chưa thêm thiết bị.</td></tr>';
+ body.innerHTML=purchaseBatchDraftItems.map(x=>`<tr><td>${escapeHtml(x.deviceCode)}</td><td>${escapeHtml(x.deviceName)}</td><td>${escapeHtml(x.category||"Chưa phân nhóm")}</td><td>${x.requestedQuantity} ${escapeHtml(x.unit)}</td><td><button class="icon-action icon-action-danger" type="button" onclick="removePurchaseBatchDraftItem('${escapeAttr(x.deviceCode)}')" title="Bỏ thiết bị">⌫</button></td></tr>`).join("")||'<tr><td colspan="5" class="muted">Chưa thêm thiết bị.</td></tr>';
 }
 async function savePurchaseBatch(){
  const name=document.getElementById("purchaseBatchName")?.value.trim(),date=document.getElementById("purchaseBatchDate")?.value;
  if(!name||!date)return alert("Vui lòng nhập Tên đợt mua và Ngày đề nghị mua.");
  if(!purchaseBatchDraftItems.length)return alert("Vui lòng thêm ít nhất một thiết bị vào đợt mua.");
- const batch={id:`PB-${Date.now()}`,code:nextPurchaseBatchCode(),name,requestDate:date,decisionNo:document.getElementById("purchaseBatchDecision")?.value.trim()||"",contractNo:document.getElementById("purchaseBatchContract")?.value.trim()||"",purchaseDate:document.getElementById("purchaseBatchPurchaseDate")?.value||"",fundingSource:document.getElementById("purchaseBatchFunding")?.value.trim()||"",value:Number(document.getElementById("purchaseBatchValue")?.value)||0,note:document.getElementById("purchaseBatchNote")?.value.trim()||"",items:purchaseBatchDraftItems.map(x=>({...x})),createdAt:new Date().toISOString()};
+ const batch={id:`PB-${Date.now()}`,code:nextPurchaseBatchCode(),name,requestDate:date,decisionNo:document.getElementById("purchaseBatchDecision")?.value.trim()||"",contractNo:document.getElementById("purchaseBatchContract")?.value.trim()||"",purchaseDate:document.getElementById("purchaseBatchPurchaseDate")?.value||"",fundingSource:document.getElementById("purchaseBatchFunding")?.value.trim()||"",value:Number(document.getElementById("purchaseBatchValue")?.value)||0,note:document.getElementById("purchaseBatchNote")?.value.trim()||"",items:purchaseBatchDraftItems.map(x=>({...x,receivedQuantity:0})),createdAt:new Date().toISOString()};
  try{await callMutate("purchase-batch.save",{batch});await loadState();closeModal("purchaseBatchModal");showOverviewTab("purchaseBatchStats");alert(`Đã lưu đợt mua ${batch.code}.`);}catch(e){}
 }
 function populatePurchaseBatchSelect(){
@@ -2019,16 +2079,20 @@ function renderPurchaseBatchDashboard(){
  const select=document.getElementById("purchaseBatchSelect");if(!select)return;
  populatePurchaseBatchSelect();
  const batch=(STATE.purchaseBatches||[]).find(b=>b.id===select.value);
- const info=document.getElementById("purchaseBatchInfo"),stats=document.getElementById("purchaseBatchStats"),body=document.getElementById("purchaseBatchRows"),loansBody=document.getElementById("purchaseBatchLoans");
+ const info=document.getElementById("purchaseBatchInfo"),stats=document.getElementById("purchaseBatchStats"),body=document.getElementById("purchaseBatchRows"),loansBody=document.getElementById("purchaseBatchLoans"),receiptsBody=document.getElementById("purchaseBatchReceipts");
  if(!batch){
   if(info)info.innerHTML='<span class="muted">Chưa có đợt mua. Bấm “Tạo đợt mua” để bắt đầu theo dõi.</span>';
-  if(stats)stats.innerHTML="";if(body)body.innerHTML='<tr><td colspan="5" class="muted">Chưa có dữ liệu đợt mua.</td></tr>';if(loansBody)loansBody.innerHTML="";return;
+  if(stats)stats.innerHTML="";if(body)body.innerHTML='<tr><td colspan="7" class="muted">Chưa có dữ liệu đợt mua.</td></tr>';if(loansBody)loansBody.innerHTML="";if(receiptsBody)receiptsBody.innerHTML="";return;
  }
  const total=(batch.items||[]).reduce((s,x)=>s+Math.max(0,Number(x.requestedQuantity)||0),0);
  if(info)info.innerHTML=`<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3 style="margin:0 0 6px">${escapeHtml(batch.name)}</h3><div class="muted">Mã đợt: <b>${escapeHtml(batch.code)}</b> · Ngày đề nghị mua: ${escapeHtml(batch.requestDate||"—")}</div><div class="muted">Quyết định: ${escapeHtml(batch.decisionNo||"—")} · Hợp đồng: ${escapeHtml(batch.contractNo||"—")} · Nguồn kinh phí: ${escapeHtml(batch.fundingSource||"—")}</div></div><div>${STATE.currentUser?.role==="admin"?`<button class="secondary" onclick="deletePurchaseBatch('${escapeAttr(batch.id)}')">Xóa đợt mua</button>`:""}</div></div>`;
- const cards=[["Số mặt hàng",(batch.items||[]).length],["Tổng số lượng đề nghị",total],["Đã nhập kho","Chưa liên kết"],["Đã cấp sử dụng","Chưa liên kết"],["Đang cho mượn","Chưa liên kết"],["Hỏng / sửa chữa","Chưa liên kết"]];
+ const receivedTotal=(batch.items||[]).reduce((s,x)=>s+Math.max(0,Number(x.receivedQuantity)||0),0);
+ const remainingTotal=Math.max(0,total-receivedTotal);
+ const cards=[["Số mặt hàng",(batch.items||[]).length],["Tổng số lượng đề nghị",total],["Đã nhập kho",receivedTotal],["Còn phải nhập",remainingTotal],["Đã cấp / đang dùng","Theo dõi theo mã thiết bị"],["Hỏng / sửa chữa","Theo dõi theo mã thiết bị"]];
  if(stats)stats.innerHTML=cards.map(([label,value])=>`<div class="card stat-card"><span class="muted">${label}</span><h2 style="font-size:${typeof value==="number"?"1.5rem":"1rem"}">${typeof value==="number"?value.toLocaleString("vi-VN"):value}</h2></div>`).join("");
- if(body)body.innerHTML=(batch.items||[]).map(x=>`<tr><td><b>${escapeHtml(x.deviceCode)}</b></td><td>${escapeHtml(x.deviceName)}</td><td>${Number(x.requestedQuantity)||0}</td><td>${escapeHtml(x.unit||"cái")}</td><td>${escapeHtml(x.category||"")}</td></tr>`).join("")||'<tr><td colspan="5" class="muted">Đợt mua chưa có thiết bị.</td></tr>';
+ if(body)body.innerHTML=(batch.items||[]).map(x=>{const requested=Math.max(0,Number(x.requestedQuantity)||0),received=Math.max(0,Number(x.receivedQuantity)||0);return `<tr><td><b>${escapeHtml(x.deviceCode)}</b></td><td>${escapeHtml(x.deviceName)}</td><td>${requested}</td><td>${received}</td><td>${Math.max(0,requested-received)}</td><td>${escapeHtml(x.unit||"cái")}</td><td>${escapeHtml(x.category||"")}</td></tr>`;}).join("")||'<tr><td colspan="7" class="muted">Đợt mua chưa có thiết bị.</td></tr>';
+ const linkedReceipts=(STATE.movements||[]).filter(m=>m.type==="Nhập kho"&&m.purchaseBatchId===batch.id&&!(m.cancelled||m.cancelledAt));
+ if(receiptsBody)receiptsBody.innerHTML=linkedReceipts.map(m=>`<tr><td>${m.createdAt?new Date(m.createdAt).toLocaleString("vi-VN"):"—"}</td><td>${escapeHtml(m.deviceCode||"")}</td><td>${Number(m.quantity||0).toLocaleString("vi-VN")} ${escapeHtml(m.unit||"cái")}</td><td>${escapeHtml(m.toLocation||"")}</td><td>${escapeHtml(m.createdBy||"")}</td></tr>`).join("")||'<tr><td colspan="5" class="muted">Chưa có phiếu nhập kho gắn với đợt mua này.</td></tr>';
  const codes=new Set((batch.items||[]).map(x=>String(x.deviceCode)));
  const loans=(STATE.loans||[]).filter(l=>codes.has(String(l.deviceCode)));
  if(loansBody)loansBody.innerHTML=loans.map(l=>`<tr><td>${escapeHtml(l.id)}</td><td>${escapeHtml(l.deviceCode)} — ${escapeHtml(l.deviceName)}</td><td>${escapeHtml(l.borrower||"")}</td><td>${escapeHtml(l.department||"")}</td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${Number(l.quantity)||0}</td><td>${Number(l.returnedQuantity)||0}</td><td>${loanActiveQty(l)}</td></tr>`).join("")||'<tr><td colspan="8" class="muted">Chưa có phiếu mượn liên quan.</td></tr>';
@@ -2042,9 +2106,9 @@ async function deletePurchaseBatch(id){
 function exportPurchaseBatchReport(){
  const batch=(STATE.purchaseBatches||[]).find(b=>b.id===document.getElementById("purchaseBatchSelect")?.value);
  if(!batch)return alert("Chưa có đợt mua để xuất báo cáo.");
- const rows=[["BÁO CÁO ĐỢT MUA"],["Mã đợt",batch.code],["Tên đợt",batch.name],["Ngày đề nghị mua",batch.requestDate],["Quyết định",batch.decisionNo||""],["Hợp đồng",batch.contractNo||""],["Ngày mua",batch.purchaseDate||""],["Nguồn kinh phí",batch.fundingSource||""],["Giá trị",batch.value||""],[],["Mã thiết bị","Tên thiết bị","Danh mục","Số lượng đề nghị","Đơn vị","Ghi chú"]];
- (batch.items||[]).forEach(x=>rows.push([x.deviceCode,x.deviceName,x.category,x.requestedQuantity,x.unit,""]));
- rows.push([],["GHI CHÚ","Báo cáo hiện ghi nhận số lượng đề nghị mua; số lượng nhập kho/cấp phát/trạng thái sẽ được cập nhật khi hoàn tất liên kết phân bổ đợt mua với giao dịch kho."]);
+ const rows=[["BÁO CÁO ĐỢT MUA"],["Mã đợt",batch.code],["Tên đợt",batch.name],["Ngày đề nghị mua",batch.requestDate],["Quyết định",batch.decisionNo||""],["Hợp đồng",batch.contractNo||""],["Ngày mua",batch.purchaseDate||""],["Nguồn kinh phí",batch.fundingSource||""],["Giá trị",batch.value||""],[],["Mã thiết bị","Tên thiết bị","Danh mục","Số lượng đề nghị","Đã nhập kho theo đợt","Còn phải nhập","Đơn vị"]];
+ (batch.items||[]).forEach(x=>{const req=Math.max(0,Number(x.requestedQuantity)||0),rec=Math.max(0,Number(x.receivedQuantity)||0);rows.push([x.deviceCode,x.deviceName,x.category,req,rec,Math.max(0,req-rec),x.unit]);});
+ rows.push([],["GHI CHÚ","Số lượng đã nhập kho là tổng số lượng của các phiếu Nhập kho có gắn mã đợt mua. Báo cáo trạng thái đang sử dụng/cho mượn/hỏng/sửa chữa theo từng đợt chưa được phân bổ riêng nếu cùng mã thiết bị thuộc nhiều đợt."]);
  downloadCSV(`bao-cao-${batch.code}.csv`,rows);
 }
 
