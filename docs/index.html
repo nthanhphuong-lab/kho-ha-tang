@@ -215,9 +215,10 @@
           </div>
           <div id="purchaseBatchInfo" class="card" style="padding:14px 16px;margin:12px 0"></div>
           <div id="purchaseBatchStats" class="stats-grid"></div>
-          <div class="card table-card"><table class="table"><thead><tr><th>Mã</th><th>Tên thiết bị/vật tư</th><th>Số lượng đề nghị</th><th>Đơn vị</th><th>Ghi chú</th></tr></thead><tbody id="purchaseBatchRows"></tbody></table></div>
+          <div class="card table-card"><table class="table"><thead><tr><th>Mã</th><th>Tên thiết bị/vật tư</th><th>Số lượng đề nghị</th><th>Đã nhập kho</th><th>Còn phải nhập</th><th>Đơn vị</th><th>Danh mục</th></tr></thead><tbody id="purchaseBatchRows"></tbody></table></div>
+          <div class="card table-card" style="margin-top:14px"><div style="padding:14px 16px"><h3>Phiếu nhập kho thuộc đợt mua</h3><p class="muted">Chỉ liệt kê phiếu Nhập kho được gắn trực tiếp với đợt mua này.</p></div><table class="table"><thead><tr><th>Ngày nhập</th><th>Mã thiết bị</th><th>Số lượng</th><th>Kho nhận</th><th>Người thực hiện</th></tr></thead><tbody id="purchaseBatchReceipts"></tbody></table></div>
           <div class="card table-card" style="margin-top:14px"><div style="padding:14px 16px"><h3>Phiếu mượn – trả liên quan</h3><p class="muted">Danh sách phiếu mượn có thiết bị nằm trong đợt mua được chọn.</p></div><table class="table"><thead><tr><th>Mã phiếu</th><th>Thiết bị</th><th>Người mượn</th><th>Đơn vị</th><th>Ngày mượn</th><th>Mượn</th><th>Đã trả</th><th>Còn</th></tr></thead><tbody id="purchaseBatchLoans"></tbody></table></div>
-          <p class="muted" style="margin-top:10px">Lưu ý: phiên bản khởi tạo đợt mua ghi nhận danh sách và số lượng đề nghị. Việc phân bổ tồn kho/cấp phát thực tế theo từng đợt sẽ được liên kết ở bước tích hợp giao dịch để không suy đoán hoặc cộng trùng dữ liệu cũ.</p>
+          <p class="muted" style="margin-top:10px">Khi nhập kho, chọn đúng đợt mua để ghi nhận thiết bị đã được mua theo đề nghị nào. Phiếu nhập kho vẫn cập nhật tồn kho bằng nghiệp vụ hiện tại. Số lượng đã nhập được tính từ các phiếu nhập còn hiệu lực có gắn đợt mua. Trạng thái cấp phát/cho mượn/hỏng/sửa chữa chưa được phân bổ theo từng đợt nếu cùng mã thiết bị xuất hiện ở nhiều đợt; không dùng thống kê theo mã thiết bị thay thế cho phân bổ lô chính xác.</p>
         </div>
         <div id="overviewLoansPanel" class="overview-tab-panel hidden">
         <div class="dashboard-section-heading"><div><h2>Quản lý cho mượn – trả thiết bị</h2><p class="muted">Theo dõi thiết bị mượn theo mã riêng hoặc vật tư mượn theo số lượng. Hạn trả không bắt buộc.</p></div><button class="primary admin-only" onclick="openLoanForm()">＋ Lập phiếu cho mượn</button></div>
@@ -725,6 +726,13 @@
           <option value="Đã sửa xong / Nhập lại kho">Đã sửa xong / Nhập lại kho</option>
           <option value="Báo thanh lý">Thanh lý / loại khỏi sử dụng</option>
         </select>
+        <div id="movPurchaseBatchWrap" class="hidden">
+          <label>Đợt mua / đề nghị mua (không bắt buộc)</label>
+          <select id="movPurchaseBatchId" onchange="updateMovementPurchaseBatchHint()">
+            <option value="">Không gắn với đợt mua</option>
+          </select>
+          <small id="movPurchaseBatchHint" class="muted">Chỉ chọn đợt mua khi hàng nhập thuộc đề nghị mua đã lập.</small>
+        </div>
         <div id="movDamageSourceWrap" class="hidden"><label>Nguồn hàng cần xử lý</label><select id="movDamageSourceType" onchange="handleMovementTypeChange()"><option value="warehouse">Từ kho còn tốt</option><option value="usage">Từ nơi sử dụng</option><option value="damaged">Từ kho hỏng / bảo hành</option><option value="repair">Từ kho đang sửa chữa</option></select></div>
         <div id="movFromWarehouseWrap"><label>Kho nguồn</label><select id="movFromLocation" onchange="handleMovementTypeChange()"></select><small id="movAvailableQty" class="muted"></small></div>
         <div id="movFromUsageWrap" class="hidden"><label>Nơi sử dụng nguồn</label><select id="movFromUsageLocation" onchange="handleMovementTypeChange()"></select></div>
@@ -861,12 +869,15 @@ CAM-003"></textarea>
         <label>Ghi chú<input id="purchaseBatchNote" placeholder="Thông tin bổ sung"></label>
       </div>
       <div style="margin-top:14px"><h3>Thiết bị trong đợt mua</h3><p class="muted">Chọn thiết bị trong danh mục hiện có và nhập số lượng đề nghị.</p>
+        <div class="form-grid" style="grid-template-columns:minmax(180px,1fr)">
+          <label>Nhóm danh mục<select id="purchaseBatchCategory" onchange="filterPurchaseBatchDevicesByCategory()"></select></label>
+        </div>
         <div class="form-grid" style="grid-template-columns:minmax(0,2fr) minmax(100px,1fr) auto">
           <label>Thiết bị<select id="purchaseBatchDevice"></select></label>
           <label>Số lượng đề nghị<input id="purchaseBatchQty" type="number" min="1" step="1" value="1"></label>
           <button type="button" class="secondary" style="align-self:end" onclick="addPurchaseBatchItemDraft()">＋ Thêm</button>
         </div>
-        <div class="table-card"><table class="table"><thead><tr><th>Mã</th><th>Thiết bị</th><th>Số lượng</th><th></th></tr></thead><tbody id="purchaseBatchDraftRows"></tbody></table></div>
+        <div class="table-card"><table class="table"><thead><tr><th>Mã</th><th>Thiết bị</th><th>Nhóm danh mục</th><th>Số lượng</th><th></th></tr></thead><tbody id="purchaseBatchDraftRows"></tbody></table></div>
       </div>
       <div class="modal-actions"><button type="button" class="secondary" onclick="closeModal('purchaseBatchModal')">Hủy</button><button type="button" class="primary" onclick="savePurchaseBatch()">Lưu đợt mua</button></div>
     </div>
