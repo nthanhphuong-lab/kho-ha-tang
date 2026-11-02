@@ -699,6 +699,17 @@
         </select>
         <label>Ghi chú (không bắt buộc)</label>
         <input type="text" id="devNotes" placeholder="Thông số, vị trí lắp, quy cách...">
+        <div id="devPurchaseBatchWrap" class="hidden" style="margin-top:10px;">
+          <label>Liên kết phiếu đề nghị mua (không bắt buộc)</label>
+          <select id="devPurchaseBatchId" onchange="handleDevicePurchaseBatchChange()">
+            <option value="">Không liên kết phiếu đề nghị mua</option>
+          </select>
+          <div id="devPurchaseBatchQtyWrap" class="hidden" style="margin-top:8px;">
+            <label>Số lượng đề nghị trong phiếu *</label>
+            <input type="number" id="devPurchaseBatchQty" min="1" step="1" value="1" inputmode="numeric">
+            <small class="muted">Số lượng này được ghi vào phiếu đề nghị; không làm thay đổi tồn kho thiết bị.</small>
+          </div>
+        </div>
         <div class="modal-actions">
           <button type="button" class="secondary" onclick="closeModal('deviceModal')">Hủy</button>
           <button type="submit" class="primary">Lưu thiết bị</button>
