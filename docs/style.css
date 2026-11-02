@@ -738,3 +738,54 @@ input,select { min-height:38px; }
   #overviewLoansPanel table.table th:nth-child(9), #overviewLoansPanel table.table td:nth-child(9) { width:14%; }
   #overviewLoansPanel .loan-action-icons .icon-action { flex:0 1 21px; width:21px; min-width:18px; height:24px; font-size:13px; }
 }
+
+
+/* V5.2.50 – Khung modal tạo đợt mua: giới hạn chiều cao, cuộn bên trong */
+#purchaseBatchModal {
+  overflow-y: auto;
+  align-items: flex-start;
+  padding: 24px 16px;
+}
+#purchaseBatchModal .modal-content {
+  width: min(760px, calc(100vw - 32px));
+  max-width: 760px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  margin: auto;
+  padding: 22px;
+  background: var(--card-bg);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(15,23,42,.28);
+}
+#purchaseBatchModal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+#purchaseBatchModal .modal-header h2 { font-size: 1.25rem; margin: 0; }
+#purchaseBatchModal .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+#purchaseBatchModal .form-grid label { min-width: 0; }
+#purchaseBatchModal input,
+#purchaseBatchModal select {
+  width: 100%;
+  min-width: 0;
+}
+@media(max-width:600px) {
+  #purchaseBatchModal { padding: 10px; }
+  #purchaseBatchModal .modal-content {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    padding: 15px;
+  }
+  #purchaseBatchModal .form-grid { grid-template-columns: 1fr !important; }
+}
