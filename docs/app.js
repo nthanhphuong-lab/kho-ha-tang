@@ -2183,7 +2183,7 @@ function renderPurchaseBatchDashboard(){
  if(stats)stats.innerHTML=cards.map(([label,value])=>`<div class="card stat-card"><span class="muted">${label}</span><h2 style="font-size:${typeof value==="number"?"1.5rem":"1rem"}">${typeof value==="number"?value.toLocaleString("vi-VN"):value}</h2></div>`).join("");
  if(body)body.innerHTML=(batch.items||[]).map(x=>{const requested=Math.max(0,Number(x.requestedQuantity)||0),received=Math.max(0,Number(x.receivedQuantity)||0);return `<tr><td><b>${escapeHtml(x.deviceCode)}</b></td><td>${escapeHtml(x.deviceName)}</td><td>${requested}</td><td>${received}</td><td>${Math.max(0,requested-received)}</td><td>${escapeHtml(x.unit||"cái")}</td><td>${escapeHtml(x.category||"")}</td></tr>`;}).join("")||'<tr><td colspan="7" class="muted">Đợt mua chưa có thiết bị.</td></tr>';
  const linkedReceipts=(STATE.movements||[]).filter(m=>m.type==="Nhập kho"&&m.purchaseBatchId===batch.id&&!(m.cancelled||m.cancelledAt));
- const initialReceipts=(batch.items||[]).filter(x=>Number(x.initialReceivedQuantity)>0&&x.initialReceiptSource==="device.add");
+ const initialReceipts=(batch.items||[]).filter(x=>Number(x.initialReceivedQuantity)>0&&String(x.initialReceiptSource||"").startsWith("device."));
  const receiptRows=[...initialReceipts.map(x=>`<tr><td>${x.initialReceivedAt?new Date(x.initialReceivedAt).toLocaleString("vi-VN"):"—"}</td><td>${escapeHtml(x.deviceCode||"")}</td><td>${Number(x.initialReceivedQuantity||0).toLocaleString("vi-VN")} ${escapeHtml(x.unit||"cái")}</td><td>${escapeHtml(x.initialReceivedLocation||"")}</td><td>${escapeHtml(x.initialReceivedBy||"")} <span class="muted">(Tạo thiết bị ban đầu)</span></td></tr>`),...linkedReceipts.map(m=>`<tr><td>${m.createdAt?new Date(m.createdAt).toLocaleString("vi-VN"):"—"}</td><td>${escapeHtml(m.deviceCode||"")}</td><td>${Number(m.quantity||0).toLocaleString("vi-VN")} ${escapeHtml(m.unit||"cái")}</td><td>${escapeHtml(m.toLocation||"")}</td><td>${escapeHtml(m.createdBy||"")}</td></tr>`)];
  if(receiptsBody)receiptsBody.innerHTML=receiptRows.join("")||'<tr><td colspan="5" class="muted">Chưa có số lượng nhận hàng được ghi nhận cho đợt mua này.</td></tr>';
  const codes=new Set((batch.items||[]).map(x=>String(x.deviceCode)));
@@ -2201,7 +2201,7 @@ function exportPurchaseBatchReport(){
  if(!batch)return alert("Chưa có đợt mua để xuất báo cáo.");
  const rows=[["BÁO CÁO ĐỢT MUA"],["Mã đợt",batch.code],["Tên đợt",batch.name],["Ngày đề nghị mua",batch.requestDate],["Quyết định",batch.decisionNo||""],["Hợp đồng",batch.contractNo||""],["Ngày mua",batch.purchaseDate||""],["Nguồn kinh phí",batch.fundingSource||""],["Giá trị",batch.value||""],[],["Mã thiết bị","Tên thiết bị","Danh mục","Số lượng đề nghị","Đã nhập kho theo đợt","Còn phải nhập","Đơn vị"]];
  (batch.items||[]).forEach(x=>{const req=Math.max(0,Number(x.requestedQuantity)||0),rec=Math.max(0,Number(x.receivedQuantity)||0);rows.push([x.deviceCode,x.deviceName,x.category,req,rec,Math.max(0,req-rec),x.unit]);});
- rows.push([],["GHI CHÚ","Số lượng đã nhập kho là tổng số lượng của các phiếu Nhập kho có gắn mã đợt mua. Báo cáo trạng thái đang sử dụng/cho mượn/hỏng/sửa chữa theo từng đợt chưa được phân bổ riêng nếu cùng mã thiết bị thuộc nhiều đợt."]);
+ rows.push([],["GHI CHÚ","Số lượng đã nhập kho gồm số lượng ghi nhận khi tạo/liên kết thiết bị đang có trong kho và các phiếu Nhập kho gắn mã đợt mua. Báo cáo trạng thái đang sử dụng/cho mượn/hỏng/sửa chữa theo từng đợt chưa được phân bổ riêng nếu cùng mã thiết bị thuộc nhiều đợt."]);
  downloadCSV(`bao-cao-${batch.code}.csv`,rows);
 }
 
