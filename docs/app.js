@@ -923,6 +923,24 @@ function handleTrackingModeChange() {
   if (unit && mode === "individual" && !unit.value) unit.value = "cái";
 }
 
+function populateDevicePurchaseBatchSelect() {
+  const select = document.getElementById("devPurchaseBatchId");
+  if (!select) return;
+  const batches = (STATE.purchaseBatches || []).slice().sort((a, b) => String(b.requestDate || "").localeCompare(String(a.requestDate || "")));
+  select.innerHTML = '<option value="">Không liên kết phiếu đề nghị mua</option>' + batches.map(b => `<option value="${escapeAttr(b.id)}">${escapeHtml(b.code)} — ${escapeHtml(b.name)} (${escapeHtml(b.requestDate || "")})</option>`).join("");
+}
+
+function handleDevicePurchaseBatchChange() {
+  const selected = !!document.getElementById("devPurchaseBatchId")?.value;
+  const qtyWrap = document.getElementById("devPurchaseBatchQtyWrap");
+  const qty = document.getElementById("devPurchaseBatchQty");
+  if (qtyWrap) qtyWrap.classList.toggle("hidden", !selected);
+  if (qty) {
+    qty.required = selected;
+    if (selected && (!qty.value || Number(qty.value) <= 0)) qty.value = document.getElementById("devQuantity")?.value || "1";
+  }
+}
+
 function openDeviceModal(deviceCode = null) {
   populateSelects();
   showModalById("deviceModal");
@@ -946,6 +964,8 @@ function openDeviceModal(deviceCode = null) {
       setElementValueSafe("devQuantity", dev.quantity ?? 1);
       setElementValueSafe("devUnit", dev.unit || "cái");
       setElementValueSafe("devNotes", dev.notes || "");
+      const batchWrap = document.getElementById("devPurchaseBatchWrap");
+      if (batchWrap) batchWrap.classList.add("hidden");
       handleTrackingModeChange();
       return;
     }
@@ -964,6 +984,14 @@ function openDeviceModal(deviceCode = null) {
   setElementValueSafe("devQuantity", "1");
   setElementValueSafe("devUnit", "cái");
   setElementValueSafe("devNotes", "");
+  const batchWrap = document.getElementById("devPurchaseBatchWrap");
+  const batchSelect = document.getElementById("devPurchaseBatchId");
+  if (batchWrap) batchWrap.classList.toggle("hidden", STATE.currentUser?.role !== "admin");
+  populateDevicePurchaseBatchSelect();
+  if (batchSelect) batchSelect.value = "";
+  const batchQty = document.getElementById("devPurchaseBatchQty");
+  if (batchQty) { batchQty.value = "1"; batchQty.required = false; }
+  handleDevicePurchaseBatchChange();
   handleDeviceCategoryChange();
 }
 
@@ -1003,8 +1031,11 @@ async function handleSaveDevice(e) {
   if (!isEdit && STATE.devices.some(d => String(d.code).toLowerCase() === code.toLowerCase())) return alert("Mã quản lý đã tồn tại. Hãy tạo mã khác.");
   if (trackingMode === "quantity" && (!Number.isFinite(quantity) || quantity <= 0)) return alert("Số lượng phải lớn hơn 0.");
   if (trackingMode === "individual" && quantity !== 1) return alert("Tài sản quản lý từng chiếc phải có số lượng bằng 1. Muốn nhập nhiều, hãy chọn quản lý theo số lượng.");
+  const purchaseBatchId = !isEdit && STATE.currentUser?.role === "admin" ? (document.getElementById("devPurchaseBatchId")?.value || "") : "";
+  const purchaseBatchRequestedQuantity = purchaseBatchId ? Number(document.getElementById("devPurchaseBatchQty")?.value || 0) : 0;
+  if (purchaseBatchId && (!Number.isInteger(purchaseBatchRequestedQuantity) || purchaseBatchRequestedQuantity <= 0)) return alert("Số lượng đề nghị trong phiếu phải là số nguyên lớn hơn 0.");
   const action = isEdit ? "device.update" : "device.add";
-  const result = await callMutate(action, { code, name, model, serial: trackingMode === "individual" ? serial : "", category, location, status, notes, trackingMode, quantity, unit });
+  const result = await callMutate(action, { code, name, model, serial: trackingMode === "individual" ? serial : "", category, location, status, notes, trackingMode, quantity, unit, purchaseBatchId, purchaseBatchRequestedQuantity });
   if (result && result.error) return;
   closeModal("deviceModal");
   await loadState();
