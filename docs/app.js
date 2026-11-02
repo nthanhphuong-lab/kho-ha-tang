@@ -2011,6 +2011,7 @@ function exportCategoryDashboardReport(){
 
 // QUẢN LÝ ĐỢT MUA + THỐNG KÊ THEO ĐỢT
 let purchaseBatchDraftItems = [];
+let purchaseBatchEditingId = "";
 function nextPurchaseBatchCode(){
  const year=new Date().getFullYear(), prefix=`DM-${year}-`;
  const nums=(STATE.purchaseBatches||[]).map(b=>String(b.code||"")).filter(c=>c.startsWith(prefix)).map(c=>Number(c.slice(prefix.length))).filter(Number.isFinite);
@@ -2032,9 +2033,10 @@ function filterPurchaseBatchDevicesByCategory(){
  if(devices.some(d=>String(d.code)===previous))deviceEl.value=previous;
 }
 function openPurchaseBatchForm(){
+ purchaseBatchEditingId="";
+ const title=document.getElementById("purchaseBatchModalTitle");if(title)title.textContent="Tạo đợt mua";
  if(STATE.currentUser?.role!=="admin")return alert("Chỉ quản trị viên mới được tạo đợt mua.");
  const devices=(STATE.devices||[]).slice();
- if(!devices.length)return alert("Danh mục thiết bị hiện chưa có thiết bị để chọn.");
  const categorySelect=document.getElementById("purchaseBatchCategory");
  if(categorySelect){
   const categories=getPurchaseBatchCategories();
@@ -2047,6 +2049,20 @@ function openPurchaseBatchForm(){
  const qty=document.getElementById("purchaseBatchQty");if(qty)qty.value="1";
  purchaseBatchDraftItems=[];renderPurchaseBatchDraftRows();showModalById("purchaseBatchModal");
 }
+function openPurchaseBatchItemsForm(id){
+ if(STATE.currentUser?.role!=="admin")return alert("Chỉ quản trị viên mới được bổ sung thiết bị.");
+ const batch=(STATE.purchaseBatches||[]).find(x=>x.id===id);if(!batch)return;
+ purchaseBatchEditingId=batch.id;
+ const fields={purchaseBatchName:batch.name||"",purchaseBatchDate:batch.requestDate||"",purchaseBatchDecision:batch.decisionNo||"",purchaseBatchContract:batch.contractNo||"",purchaseBatchPurchaseDate:batch.purchaseDate||"",purchaseBatchFunding:batch.fundingSource||"",purchaseBatchValue:batch.value||"",purchaseBatchNote:batch.note||""};
+ Object.entries(fields).forEach(([id,value])=>{const el=document.getElementById(id);if(el)el.value=value;});
+ const categories=getPurchaseBatchCategories(),categorySelect=document.getElementById("purchaseBatchCategory");
+ if(categorySelect){categorySelect.innerHTML=categories.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join("");categorySelect.value=categories[0]||"";}
+ filterPurchaseBatchDevicesByCategory();
+ purchaseBatchDraftItems=(batch.items||[]).map(x=>({...x}));
+ renderPurchaseBatchDraftRows();
+ const title=document.getElementById("purchaseBatchModalTitle");if(title)title.textContent=`Bổ sung thiết bị – ${batch.code}`;
+ showModalById("purchaseBatchModal");
+}
 function addPurchaseBatchItemDraft(){
  const code=document.getElementById("purchaseBatchDevice")?.value, qty=Number(document.getElementById("purchaseBatchQty")?.value);
  const d=(STATE.devices||[]).find(x=>String(x.code)===String(code));
@@ -2056,7 +2072,7 @@ function addPurchaseBatchItemDraft(){
  if(old)old.requestedQuantity+=qty;else purchaseBatchDraftItems.push({deviceCode:d.code,deviceName:d.name,category:d.category,unit:d.unit||"cái",requestedQuantity:qty});
  renderPurchaseBatchDraftRows();
 }
-function removePurchaseBatchDraftItem(code){purchaseBatchDraftItems=purchaseBatchDraftItems.filter(x=>x.deviceCode!==code);renderPurchaseBatchDraftRows();}
+function removePurchaseBatchDraftItem(code){const existing=(STATE.purchaseBatches||[]).find(x=>x.id===purchaseBatchEditingId);const old=(existing?.items||[]).find(x=>String(x.deviceCode)===String(code));if(Number(old?.receivedQuantity)>0)return alert("Thiết bị đã có phiếu nhập kho thuộc đợt mua, không thể bỏ khỏi danh sách.");purchaseBatchDraftItems=purchaseBatchDraftItems.filter(x=>x.deviceCode!==code);renderPurchaseBatchDraftRows();}
 function renderPurchaseBatchDraftRows(){
  const body=document.getElementById("purchaseBatchDraftRows");if(!body)return;
  body.innerHTML=purchaseBatchDraftItems.map(x=>`<tr><td>${escapeHtml(x.deviceCode)}</td><td>${escapeHtml(x.deviceName)}</td><td>${escapeHtml(x.category||"Chưa phân nhóm")}</td><td>${x.requestedQuantity} ${escapeHtml(x.unit)}</td><td><button class="icon-action icon-action-danger" type="button" onclick="removePurchaseBatchDraftItem('${escapeAttr(x.deviceCode)}')" title="Bỏ thiết bị">⌫</button></td></tr>`).join("")||'<tr><td colspan="5" class="muted">Chưa thêm thiết bị.</td></tr>';
@@ -2064,9 +2080,9 @@ function renderPurchaseBatchDraftRows(){
 async function savePurchaseBatch(){
  const name=document.getElementById("purchaseBatchName")?.value.trim(),date=document.getElementById("purchaseBatchDate")?.value;
  if(!name||!date)return alert("Vui lòng nhập Tên đợt mua và Ngày đề nghị mua.");
- if(!purchaseBatchDraftItems.length)return alert("Vui lòng thêm ít nhất một thiết bị vào đợt mua.");
- const batch={id:`PB-${Date.now()}`,code:nextPurchaseBatchCode(),name,requestDate:date,decisionNo:document.getElementById("purchaseBatchDecision")?.value.trim()||"",contractNo:document.getElementById("purchaseBatchContract")?.value.trim()||"",purchaseDate:document.getElementById("purchaseBatchPurchaseDate")?.value||"",fundingSource:document.getElementById("purchaseBatchFunding")?.value.trim()||"",value:Number(document.getElementById("purchaseBatchValue")?.value)||0,note:document.getElementById("purchaseBatchNote")?.value.trim()||"",items:purchaseBatchDraftItems.map(x=>({...x,receivedQuantity:0})),createdAt:new Date().toISOString()};
- try{await callMutate("purchase-batch.save",{batch});await loadState();closeModal("purchaseBatchModal");showOverviewTab("purchaseBatchStats");alert(`Đã lưu đợt mua ${batch.code}.`);}catch(e){}
+const existing=(STATE.purchaseBatches||[]).find(x=>x.id===purchaseBatchEditingId);
+ const batch={id:existing?.id||`PB-${Date.now()}`,code:existing?.code||nextPurchaseBatchCode(),name,requestDate:date,decisionNo:document.getElementById("purchaseBatchDecision")?.value.trim()||"",contractNo:document.getElementById("purchaseBatchContract")?.value.trim()||"",purchaseDate:document.getElementById("purchaseBatchPurchaseDate")?.value||"",fundingSource:document.getElementById("purchaseBatchFunding")?.value.trim()||"",value:Number(document.getElementById("purchaseBatchValue")?.value)||0,note:document.getElementById("purchaseBatchNote")?.value.trim()||"",items:purchaseBatchDraftItems.map(x=>{const old=(existing?.items||[]).find(y=>String(y.deviceCode)===String(x.deviceCode));return {...x,receivedQuantity:Math.max(Number(x.receivedQuantity)||0,Number(old?.receivedQuantity)||0)};}),createdAt:existing?.createdAt||new Date().toISOString()};
+ try{await callMutate("purchase-batch.save",{batch});await loadState();closeModal("purchaseBatchModal");showOverviewTab("purchaseBatchStats");alert(purchaseBatchDraftItems.length ? `Đã lưu đợt mua ${batch.code}.` : `Đã tạo đợt mua ${batch.code}. Bạn có thể mở lại để bổ sung thiết bị sau.`);}catch(e){}
 }
 function populatePurchaseBatchSelect(){
  const el=document.getElementById("purchaseBatchSelect");if(!el)return;
@@ -2085,7 +2101,7 @@ function renderPurchaseBatchDashboard(){
   if(stats)stats.innerHTML="";if(body)body.innerHTML='<tr><td colspan="7" class="muted">Chưa có dữ liệu đợt mua.</td></tr>';if(loansBody)loansBody.innerHTML="";if(receiptsBody)receiptsBody.innerHTML="";return;
  }
  const total=(batch.items||[]).reduce((s,x)=>s+Math.max(0,Number(x.requestedQuantity)||0),0);
- if(info)info.innerHTML=`<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3 style="margin:0 0 6px">${escapeHtml(batch.name)}</h3><div class="muted">Mã đợt: <b>${escapeHtml(batch.code)}</b> · Ngày đề nghị mua: ${escapeHtml(batch.requestDate||"—")}</div><div class="muted">Quyết định: ${escapeHtml(batch.decisionNo||"—")} · Hợp đồng: ${escapeHtml(batch.contractNo||"—")} · Nguồn kinh phí: ${escapeHtml(batch.fundingSource||"—")}</div></div><div>${STATE.currentUser?.role==="admin"?`<button class="secondary" onclick="deletePurchaseBatch('${escapeAttr(batch.id)}')">Xóa đợt mua</button>`:""}</div></div>`;
+ if(info)info.innerHTML=`<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3 style="margin:0 0 6px">${escapeHtml(batch.name)}</h3><div class="muted">Mã đợt: <b>${escapeHtml(batch.code)}</b> · Ngày đề nghị mua: ${escapeHtml(batch.requestDate||"—")}</div><div class="muted">Quyết định: ${escapeHtml(batch.decisionNo||"—")} · Hợp đồng: ${escapeHtml(batch.contractNo||"—")} · Nguồn kinh phí: ${escapeHtml(batch.fundingSource||"—")}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">${STATE.currentUser?.role==="admin"?`<button class="primary" onclick="openPurchaseBatchItemsForm('${escapeAttr(batch.id)}')">＋ Bổ sung thiết bị</button><button class="secondary" onclick="deletePurchaseBatch('${escapeAttr(batch.id)}')">Xóa đợt mua</button>`:""}</div></div>`;
  const receivedTotal=(batch.items||[]).reduce((s,x)=>s+Math.max(0,Number(x.receivedQuantity)||0),0);
  const remainingTotal=Math.max(0,total-receivedTotal);
  const cards=[["Số mặt hàng",(batch.items||[]).length],["Tổng số lượng đề nghị",total],["Đã nhập kho",receivedTotal],["Còn phải nhập",remainingTotal],["Đã cấp / đang dùng","Theo dõi theo mã thiết bị"],["Hỏng / sửa chữa","Theo dõi theo mã thiết bị"]];
