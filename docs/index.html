@@ -683,7 +683,7 @@
           <option value="quantity">Theo số lượng tồn kho</option>
         </select>
         <div id="devQuantityWrap" class="quantity-entry-row">
-          <div><label>Số lượng *</label><input type="number" id="devQuantity" min="0.001" step="any" value="1" inputmode="decimal" required></div>
+          <div><label>Số lượng *</label><input type="number" id="devQuantity" min="0.001" step="any" value="1" inputmode="decimal" oninput="handleTrackingModeChange()" required></div>
           <div><label>Đơn vị *</label><input type="text" id="devUnit" list="unitSuggestions" value="cái" placeholder="cái, mét, sợi..." required></div>
         </div>
         <datalist id="unitSuggestions">
@@ -707,7 +707,7 @@
           </select>
           <div id="devPurchaseBatchQtyWrap" class="hidden" style="margin-top:8px;">
             <label>Số lượng đề nghị trong phiếu *</label>
-            <input type="number" id="devPurchaseBatchQty" min="1" step="1" value="1" inputmode="numeric">
+            <input type="number" id="devPurchaseBatchQty" min="1" step="1" value="1" inputmode="numeric" oninput="this.dataset.autoDefault='false'">
             <small class="muted">Số lượng đề nghị của phiếu. Khi lưu thiết bị, số lượng tạo mới được ghi nhận là đã nhập kho; tồn kho chỉ cộng một lần.</small>
             <button type="button" class="secondary" style="margin-top:6px;" onclick="addDevicePurchaseBatchLinkDraft()">＋ Bổ sung liên kết</button>
           </div>
