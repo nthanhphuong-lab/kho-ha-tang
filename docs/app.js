@@ -908,6 +908,8 @@ function handleDeviceCategoryChange() {
 }
 
 function handleTrackingModeChange() {
+  const batchQty = document.getElementById("devPurchaseBatchQty");
+  if (batchQty?.dataset.autoDefault === "true") batchQty.value = document.getElementById("devQuantity")?.value || "1";
   const mode = document.getElementById("devTrackingMode")?.value || "individual";
   const serialWrap = document.getElementById("devSerialWrap");
   const qtyWrap = document.getElementById("devQuantityWrap");
@@ -925,16 +927,28 @@ function handleTrackingModeChange() {
 
 let devicePurchaseBatchPendingLinks = [];
 let devicePurchaseBatchExistingLinks = [];
+let devicePurchaseBatchUnlinkIds = [];
 function renderDevicePurchaseBatchLinks() {
   const existing = document.getElementById("devPurchaseBatchExisting");
   const pending = document.getElementById("devPurchaseBatchPending");
   const fmt = x => `${escapeHtml(x.code || "") } — ${escapeHtml(x.name || "")} (${Number(x.requestedQuantity || 0)} ${escapeHtml(x.unit || "")})`;
   if (existing) existing.innerHTML = devicePurchaseBatchExistingLinks.length
-    ? `<div><b>Đã liên kết:</b><ul>${devicePurchaseBatchExistingLinks.map(x => `<li>${fmt(x)}</li>`).join("")}</ul></div>`
+    ? `<div><b>Đã liên kết:</b><ul>${devicePurchaseBatchExistingLinks.map(x => `<li>${fmt(x)} <button type="button" class="secondary" style="padding:2px 7px;margin-left:6px" onclick="removeDevicePurchaseBatchLink('${escapeAttr(x.batchId)}')">Gỡ liên kết</button></li>`).join("")}</ul></div>`
     : `<span>Chưa liên kết phiếu đề nghị mua nào.</span>`;
   if (pending) pending.innerHTML = devicePurchaseBatchPendingLinks.length
     ? `<div><b>Sẽ bổ sung khi lưu:</b><ul>${devicePurchaseBatchPendingLinks.map(x => `<li>${fmt(x)}</li>`).join("")}</ul></div>` : "";
 }
+
+function removeDevicePurchaseBatchLink(batchId) {
+  if (STATE.currentUser?.role !== "admin") return alert("Chỉ Admin được gỡ liên kết phiếu đề nghị mua.");
+  const link = devicePurchaseBatchExistingLinks.find(x => String(x.batchId) === String(batchId));
+  if (!link) return;
+  if (!confirm(`Gỡ liên kết thiết bị khỏi phiếu ${link.code}? Lịch sử nhập kho và tồn kho sẽ được giữ nguyên.`)) return;
+  devicePurchaseBatchExistingLinks = devicePurchaseBatchExistingLinks.filter(x => String(x.batchId) !== String(batchId));
+  if (!devicePurchaseBatchUnlinkIds.includes(batchId)) devicePurchaseBatchUnlinkIds.push(batchId);
+  renderDevicePurchaseBatchLinks();
+}
+
 function addDevicePurchaseBatchLinkDraft() {
   if (STATE.currentUser?.role !== "admin") return alert("Chỉ Admin được liên kết phiếu đề nghị mua.");
   const batchId = document.getElementById("devPurchaseBatchId")?.value || "";
@@ -944,10 +958,10 @@ function addDevicePurchaseBatchLinkDraft() {
   if (!Number.isInteger(requestedQuantity) || requestedQuantity <= 0) return alert("Số lượng đề nghị phải là số nguyên lớn hơn 0.");
   const batch = (STATE.purchaseBatches || []).find(x => String(x.id) === String(batchId));
   if (!batch) return alert("Không tìm thấy phiếu đề nghị mua.");
-  if ((batch.items || []).some(x => String(x.deviceCode).toLowerCase() === code.toLowerCase()) || devicePurchaseBatchPendingLinks.some(x => x.batchId === batchId)) return alert("Thiết bị đã có trong phiếu này hoặc đã được thêm vào danh sách chờ.");
+  if ((batch.items || []).some(x => !x.unlinkedAt && String(x.deviceCode).toLowerCase() === code.toLowerCase()) || devicePurchaseBatchPendingLinks.some(x => x.batchId === batchId)) return alert("Thiết bị đã có trong phiếu này hoặc đã được thêm vào danh sách chờ.");
   devicePurchaseBatchPendingLinks.push({ batchId, code: batch.code, name: batch.name, requestedQuantity, unit: document.getElementById("devUnit")?.value || "cái" });
   document.getElementById("devPurchaseBatchId").value = "";
-  document.getElementById("devPurchaseBatchQty").value = "1";
+  document.getElementById("devPurchaseBatchQty").value = document.getElementById("devQuantity")?.value || "1";
   handleDevicePurchaseBatchChange();
   renderDevicePurchaseBatchLinks();
 }
@@ -966,7 +980,7 @@ function handleDevicePurchaseBatchChange() {
   if (qtyWrap) qtyWrap.classList.toggle("hidden", !selected);
   if (qty) {
     qty.required = selected;
-    if (selected && (!qty.value || Number(qty.value) <= 0)) qty.value = document.getElementById("devQuantity")?.value || "1";
+    if (selected && (!qty.value || Number(qty.value) <= 0 || qty.dataset.autoDefault !== "false")) { qty.value = document.getElementById("devQuantity")?.value || "1"; qty.dataset.autoDefault = "true"; }
   }
 }
 
@@ -997,9 +1011,10 @@ function openDeviceModal(deviceCode = null) {
       if (batchWrap) batchWrap.classList.toggle("hidden", STATE.currentUser?.role !== "admin");
       populateDevicePurchaseBatchSelect();
       devicePurchaseBatchPendingLinks = [];
-      devicePurchaseBatchExistingLinks = (STATE.purchaseBatches || []).flatMap(b => (b.items || []).filter(x => String(x.deviceCode).toLowerCase() === clean).map(x => ({ batchId: b.id, code: b.code, name: b.name, requestedQuantity: x.requestedQuantity, unit: x.unit || dev.unit || "cái" })));
+      devicePurchaseBatchUnlinkIds = [];
+      devicePurchaseBatchExistingLinks = (STATE.purchaseBatches || []).flatMap(b => (b.items || []).filter(x => !x.unlinkedAt && String(x.deviceCode).toLowerCase() === clean).map(x => ({ batchId: b.id, code: b.code, name: b.name, requestedQuantity: x.requestedQuantity, unit: x.unit || dev.unit || "cái" })));
       const batchSelect = document.getElementById("devPurchaseBatchId"); if (batchSelect) batchSelect.value = "";
-      const batchQty = document.getElementById("devPurchaseBatchQty"); if (batchQty) { batchQty.value = "1"; batchQty.required = false; }
+      const batchQty = document.getElementById("devPurchaseBatchQty"); if (batchQty) { batchQty.value = "1"; batchQty.required = false; batchQty.dataset.autoDefault = "true"; }
       handleDevicePurchaseBatchChange(); renderDevicePurchaseBatchLinks();
       handleTrackingModeChange();
       return;
@@ -1022,11 +1037,11 @@ function openDeviceModal(deviceCode = null) {
   const batchWrap = document.getElementById("devPurchaseBatchWrap");
   const batchSelect = document.getElementById("devPurchaseBatchId");
   if (batchWrap) batchWrap.classList.toggle("hidden", STATE.currentUser?.role !== "admin");
-  devicePurchaseBatchPendingLinks = []; devicePurchaseBatchExistingLinks = []; renderDevicePurchaseBatchLinks();
+  devicePurchaseBatchPendingLinks = []; devicePurchaseBatchExistingLinks = []; devicePurchaseBatchUnlinkIds = []; renderDevicePurchaseBatchLinks();
   populateDevicePurchaseBatchSelect();
   if (batchSelect) batchSelect.value = "";
   const batchQty = document.getElementById("devPurchaseBatchQty");
-  if (batchQty) { batchQty.value = "1"; batchQty.required = false; }
+  if (batchQty) { batchQty.value = "1"; batchQty.required = false; batchQty.dataset.autoDefault = "true"; }
   handleDevicePurchaseBatchChange();
   handleDeviceCategoryChange();
 }
@@ -1078,8 +1093,9 @@ async function handleSaveDevice(e) {
   const purchaseBatchId = !isEdit && STATE.currentUser?.role === "admin" ? (pendingLinks[0]?.batchId || "") : "";
   const purchaseBatchRequestedQuantity = purchaseBatchId ? Number(pendingLinks[0]?.requestedQuantity || 0) : 0;
   const purchaseBatchLinks = isEdit && STATE.currentUser?.role === "admin" ? pendingLinks : [];
+  const purchaseBatchUnlinks = isEdit && STATE.currentUser?.role === "admin" ? devicePurchaseBatchUnlinkIds.slice() : [];
   const action = isEdit ? "device.update" : "device.add";
-  const result = await callMutate(action, { code, name, model, serial: trackingMode === "individual" ? serial : "", category, location, status, notes, trackingMode, quantity, unit, purchaseBatchId, purchaseBatchRequestedQuantity, purchaseBatchLinks });
+  const result = await callMutate(action, { code, name, model, serial: trackingMode === "individual" ? serial : "", category, location, status, notes, trackingMode, quantity, unit, purchaseBatchId, purchaseBatchRequestedQuantity, purchaseBatchLinks, purchaseBatchUnlinks });
   if (result && result.error) return;
   closeModal("deviceModal");
   await loadState();
@@ -2133,7 +2149,7 @@ function openPurchaseBatchItemsForm(id){
  const categories=getPurchaseBatchCategories(),categorySelect=document.getElementById("purchaseBatchCategory");
  if(categorySelect){categorySelect.innerHTML=categories.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join("");categorySelect.value=categories[0]||"";}
  filterPurchaseBatchDevicesByCategory();
- purchaseBatchDraftItems=(batch.items||[]).map(x=>({...x}));
+ purchaseBatchDraftItems=(batch.items||[]).filter(x=>!x.unlinkedAt).map(x=>({...x}));
  renderPurchaseBatchDraftRows();
  const title=document.getElementById("purchaseBatchModalTitle");if(title)title.textContent=`Bổ sung thiết bị – ${batch.code}`;
  showModalById("purchaseBatchModal");
@@ -2147,7 +2163,7 @@ function addPurchaseBatchItemDraft(){
  if(old)old.requestedQuantity+=qty;else purchaseBatchDraftItems.push({deviceCode:d.code,deviceName:d.name,category:d.category,unit:d.unit||"cái",requestedQuantity:qty});
  renderPurchaseBatchDraftRows();
 }
-function removePurchaseBatchDraftItem(code){const existing=(STATE.purchaseBatches||[]).find(x=>x.id===purchaseBatchEditingId);const old=(existing?.items||[]).find(x=>String(x.deviceCode)===String(code));if(Number(old?.receivedQuantity)>0)return alert("Thiết bị đã có phiếu nhập kho thuộc đợt mua, không thể bỏ khỏi danh sách.");purchaseBatchDraftItems=purchaseBatchDraftItems.filter(x=>x.deviceCode!==code);renderPurchaseBatchDraftRows();}
+function removePurchaseBatchDraftItem(code){const existing=(STATE.purchaseBatches||[]).find(x=>x.id===purchaseBatchEditingId);const old=(existing?.items||[]).find(x=>!x.unlinkedAt&&String(x.deviceCode)===String(code));if(old&&Number(old.receivedQuantity)>0&&!confirm(`Thiết bị ${code} đã ghi nhận nhập kho. Gỡ khỏi danh sách đợt mua nhưng giữ nguyên lịch sử nhập kho và tồn kho?`))return;purchaseBatchDraftItems=purchaseBatchDraftItems.filter(x=>x.deviceCode!==code);renderPurchaseBatchDraftRows();}
 function renderPurchaseBatchDraftRows(){
  const body=document.getElementById("purchaseBatchDraftRows");if(!body)return;
  body.innerHTML=purchaseBatchDraftItems.map(x=>`<tr><td>${escapeHtml(x.deviceCode)}</td><td>${escapeHtml(x.deviceName)}</td><td>${escapeHtml(x.category||"Chưa phân nhóm")}</td><td>${x.requestedQuantity} ${escapeHtml(x.unit)}</td><td><button class="icon-action icon-action-danger" type="button" onclick="removePurchaseBatchDraftItem('${escapeAttr(x.deviceCode)}')" title="Bỏ thiết bị">⌫</button></td></tr>`).join("")||'<tr><td colspan="5" class="muted">Chưa thêm thiết bị.</td></tr>';
@@ -2175,18 +2191,18 @@ function renderPurchaseBatchDashboard(){
   if(info)info.innerHTML='<span class="muted">Chưa có đợt mua. Bấm “Tạo đợt mua” để bắt đầu theo dõi.</span>';
   if(stats)stats.innerHTML="";if(body)body.innerHTML='<tr><td colspan="7" class="muted">Chưa có dữ liệu đợt mua.</td></tr>';if(loansBody)loansBody.innerHTML="";if(receiptsBody)receiptsBody.innerHTML="";return;
  }
- const total=(batch.items||[]).reduce((s,x)=>s+Math.max(0,Number(x.requestedQuantity)||0),0);
+ const total=(batch.items||[]).filter(x=>!x.unlinkedAt).reduce((s,x)=>s+Math.max(0,Number(x.requestedQuantity)||0),0);
  if(info)info.innerHTML=`<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3 style="margin:0 0 6px">${escapeHtml(batch.name)}</h3><div class="muted">Mã đợt: <b>${escapeHtml(batch.code)}</b> · Ngày đề nghị mua: ${escapeHtml(batch.requestDate||"—")}</div><div class="muted">Quyết định: ${escapeHtml(batch.decisionNo||"—")} · Hợp đồng: ${escapeHtml(batch.contractNo||"—")} · Nguồn kinh phí: ${escapeHtml(batch.fundingSource||"—")}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">${STATE.currentUser?.role==="admin"?`<button class="primary" onclick="openPurchaseBatchItemsForm('${escapeAttr(batch.id)}')">＋ Bổ sung thiết bị</button><button class="secondary" onclick="deletePurchaseBatch('${escapeAttr(batch.id)}')">Xóa đợt mua</button>`:""}</div></div>`;
- const receivedTotal=(batch.items||[]).reduce((s,x)=>s+Math.max(0,Number(x.receivedQuantity)||0),0);
+ const receivedTotal=(batch.items||[]).filter(x=>!x.unlinkedAt).reduce((s,x)=>s+Math.max(0,Number(x.receivedQuantity)||0),0);
  const remainingTotal=Math.max(0,total-receivedTotal);
- const cards=[["Số mặt hàng",(batch.items||[]).length],["Tổng số lượng đề nghị",total],["Đã nhập kho",receivedTotal],["Còn phải nhập",remainingTotal],["Đã cấp / đang dùng","Theo dõi theo mã thiết bị"],["Hỏng / sửa chữa","Theo dõi theo mã thiết bị"]];
+ const cards=[["Số mặt hàng",(batch.items||[]).filter(x=>!x.unlinkedAt).length],["Tổng số lượng đề nghị",total],["Đã nhập kho",receivedTotal],["Còn phải nhập",remainingTotal],["Đã cấp / đang dùng","Theo dõi theo mã thiết bị"],["Hỏng / sửa chữa","Theo dõi theo mã thiết bị"]];
  if(stats)stats.innerHTML=cards.map(([label,value])=>`<div class="card stat-card"><span class="muted">${label}</span><h2 style="font-size:${typeof value==="number"?"1.5rem":"1rem"}">${typeof value==="number"?value.toLocaleString("vi-VN"):value}</h2></div>`).join("");
- if(body)body.innerHTML=(batch.items||[]).map(x=>{const requested=Math.max(0,Number(x.requestedQuantity)||0),received=Math.max(0,Number(x.receivedQuantity)||0);return `<tr><td><b>${escapeHtml(x.deviceCode)}</b></td><td>${escapeHtml(x.deviceName)}</td><td>${requested}</td><td>${received}</td><td>${Math.max(0,requested-received)}</td><td>${escapeHtml(x.unit||"cái")}</td><td>${escapeHtml(x.category||"")}</td></tr>`;}).join("")||'<tr><td colspan="7" class="muted">Đợt mua chưa có thiết bị.</td></tr>';
+ if(body)body.innerHTML=(batch.items||[]).filter(x=>!x.unlinkedAt).map(x=>{const requested=Math.max(0,Number(x.requestedQuantity)||0),received=Math.max(0,Number(x.receivedQuantity)||0);return `<tr><td><b>${escapeHtml(x.deviceCode)}</b></td><td>${escapeHtml(x.deviceName)}</td><td>${requested}</td><td>${received}</td><td>${Math.max(0,requested-received)}</td><td>${escapeHtml(x.unit||"cái")}</td><td>${escapeHtml(x.category||"")}</td></tr>`;}).join("")||'<tr><td colspan="7" class="muted">Đợt mua chưa có thiết bị.</td></tr>';
  const linkedReceipts=(STATE.movements||[]).filter(m=>m.type==="Nhập kho"&&m.purchaseBatchId===batch.id&&!(m.cancelled||m.cancelledAt));
- const initialReceipts=(batch.items||[]).filter(x=>Number(x.initialReceivedQuantity)>0&&String(x.initialReceiptSource||"").startsWith("device."));
+ const initialReceipts=(batch.items||[]).filter(x=>!x.unlinkedAt&&Number(x.initialReceivedQuantity)>0&&String(x.initialReceiptSource||"").startsWith("device."));
  const receiptRows=[...initialReceipts.map(x=>`<tr><td>${x.initialReceivedAt?new Date(x.initialReceivedAt).toLocaleString("vi-VN"):"—"}</td><td>${escapeHtml(x.deviceCode||"")}</td><td>${Number(x.initialReceivedQuantity||0).toLocaleString("vi-VN")} ${escapeHtml(x.unit||"cái")}</td><td>${escapeHtml(x.initialReceivedLocation||"")}</td><td>${escapeHtml(x.initialReceivedBy||"")} <span class="muted">(Tạo thiết bị ban đầu)</span></td></tr>`),...linkedReceipts.map(m=>`<tr><td>${m.createdAt?new Date(m.createdAt).toLocaleString("vi-VN"):"—"}</td><td>${escapeHtml(m.deviceCode||"")}</td><td>${Number(m.quantity||0).toLocaleString("vi-VN")} ${escapeHtml(m.unit||"cái")}</td><td>${escapeHtml(m.toLocation||"")}</td><td>${escapeHtml(m.createdBy||"")}</td></tr>`)];
  if(receiptsBody)receiptsBody.innerHTML=receiptRows.join("")||'<tr><td colspan="5" class="muted">Chưa có số lượng nhận hàng được ghi nhận cho đợt mua này.</td></tr>';
- const codes=new Set((batch.items||[]).map(x=>String(x.deviceCode)));
+ const codes=new Set((batch.items||[]).filter(x=>!x.unlinkedAt).map(x=>String(x.deviceCode)));
  const loans=(STATE.loans||[]).filter(l=>codes.has(String(l.deviceCode)));
  if(loansBody)loansBody.innerHTML=loans.map(l=>`<tr><td>${escapeHtml(l.id)}</td><td>${escapeHtml(l.deviceCode)} — ${escapeHtml(l.deviceName)}</td><td>${escapeHtml(l.borrower||"")}</td><td>${escapeHtml(l.department||"")}</td><td>${escapeHtml(loanDate(l.loanDate))}</td><td>${Number(l.quantity)||0}</td><td>${Number(l.returnedQuantity)||0}</td><td>${loanActiveQty(l)}</td></tr>`).join("")||'<tr><td colspan="8" class="muted">Chưa có phiếu mượn liên quan.</td></tr>';
 }
